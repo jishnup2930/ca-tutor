@@ -55,7 +55,7 @@ describe("startup and storage", () => {
     render(<App />);
     expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghana/ })).toBeTruthy();
     expect(screen.getByText(dailyQuote(new Date()))).toBeTruthy();
-    expect(screen.getByText("— Jishnu")).toBeTruthy();
+    expect(screen.getByText("— Jishnu Pedengal")).toBeTruthy();
     expect(screen.queryByPlaceholderText("Enter your name")).toBeNull();
   });
 

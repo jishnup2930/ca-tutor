@@ -32,7 +32,7 @@ const tint = (c: string) => ({ "--c": c }) as React.CSSProperties;
 
 const NAME = "Meghana";
 
-// Jishnu's notes: one is shown per day, cycling through the list. Add or edit freely.
+// Jishnu Pedengal's notes: one is shown per day, cycling through the list. Add or edit freely.
 export const QUOTES = [
   "You're not alone in this journey. I'm with you, cheering you on every step of the way. ❤️",
   "One day at a time, one topic at a time. You're doing better than you think.",
@@ -212,7 +212,7 @@ export default function App() {
     <aside className={`sidebar ${mobileNav ? "show" : ""}`}>
       <div className="profile-mini"><div className="avatar">{NAME[0]}</div><div><b>{NAME}</b><small>May 2027 attempt</small></div><button className="icon-btn close-nav" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
       <nav>{nav.map(group => <div className="nav-group" key={group.label}><div className="nav-heading"><group.icon size={14}/>{group.label}</div>{group.items.map(item => <button key={item} className={`nav-item ${page === item ? "active" : ""}`} onClick={() => go(item)}>{item === "Dashboard" ? <Home/> : item === "Syllabus" ? <Layers/> : item === "Learn & Notes" ? <FileText/> : item === "Practice" ? <ClipboardList/> : item === "Flashcards" ? <Brain/> : item === "Revision" ? <RotateCcw/> : item === "Study Log" ? <Clock3/> : item === "Analytics" ? <Activity/> : <Settings/>}{item}</button>)}</div>)}</nav>
-      <div className="sidebar-bottom"><p className="tiny muted">Made with love by Jishnu</p><div className="exam-card"><b>CA Final, May 2027</b><small>Keep going. You've got this.</small></div></div>
+      <div className="sidebar-bottom"><p className="tiny muted">Made with love by Jishnu Pedengal</p><div className="exam-card"><b>CA Final, May 2027</b><small>Keep going. You've got this.</small></div></div>
     </aside>
     {mobileNav && <div className="scrim" onClick={() => setMobileNav(false)}/>}
     <main className="main">
@@ -273,7 +273,7 @@ function Dashboard({data,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data
   return <>
     <section className="hello"><h1>Hi, <b>{NAME}</b></h1><p>One chapter at a time.</p></section>
     <div className="dash-top">
-      <section className="personal-note"><div className="note-body"><h2>Today's note</h2><p className="note-text">{dailyQuote(new Date())}</p><p className="note-sign">— Jishnu</p><button className="primary" onClick={onAdd}><Plus size={18}/> Log study time</button></div><HeartArt/></section>
+      <section className="personal-note"><div className="note-body"><h2>Today's note</h2><p className="note-text">{dailyQuote(new Date())}</p><p className="note-sign">— Jishnu Pedengal</p><button className="primary" onClick={onAdd}><Plus size={18}/> Log study time</button></div><HeartArt/></section>
       <button className="progress-card" onClick={()=>onNavigate("Syllabus")}>
         <div className="pc-head"><div><span className="pc-icon"><Layers size={18}/></span><b>Syllabus progress</b><small>{done} of {data.topics.length} chapters done</small></div><div className="pc-big">{progress}<span>%</span></div></div>
         <div className="slider"><span style={{width:`${progress}%`}}/></div>
