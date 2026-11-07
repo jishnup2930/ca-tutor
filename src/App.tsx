@@ -269,9 +269,10 @@ function Dashboard({data,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data
   const next = data.revisions.filter(r=>!r.done).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
   const lastTopic = [...data.sessions].sort((a,b)=>b.date.localeCompare(a.date))[0];
   const done = data.topics.filter(t=>t.status==="Completed").length;
+  const todayMins = data.sessions.filter(s=>s.date===today()).reduce((n,s)=>n+s.minutes,0);
   const paper = (id: string) => { const all = data.topics.filter(t=>t.subjectId===id); const d = all.filter(t=>t.status==="Completed").length; return { all: all.length, done: d, pct: all.length ? Math.round(d / all.length * 100) : 0 }; };
   return <>
-    <section className="hello"><div><h1>Hi, <b>{NAME}</b></h1><p>One chapter at a time.</p></div><img className="hello-figure" src="./meghana-figure.webp" alt="" width={210} height={560}/></section>
+    <section className="hello"><div><h1>Hi, <b>{NAME}</b></h1><p>{todayMins ? `You've studied ${fmtHours(todayMins).replace(/^0h /, "").replace(/ 0m$/, "")} today.` : "Ready for today's first session?"}</p></div><img className="hello-figure" src="./meghana-figure.webp" alt="" width={210} height={560}/></section>
     <div className="dash-top">
       <section className="personal-note"><div className="note-body"><h2>Today's note</h2><p className="note-text">{dailyQuote(new Date())}</p><p className="note-sign">— Jishnu Pedengal</p><button className="primary" onClick={onAdd}><Plus size={18}/> Log study time</button></div><HeartArt/></section>
       <button className="progress-card" onClick={()=>onNavigate("Syllabus")}>

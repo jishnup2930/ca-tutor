@@ -56,6 +56,7 @@ describe("startup and storage", () => {
     expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghana/ })).toBeTruthy();
     expect(screen.getByText(dailyQuote(new Date()))).toBeTruthy();
     expect(screen.getByText("— Jishnu Pedengal")).toBeTruthy();
+    expect(screen.getByText("Ready for today's first session?")).toBeTruthy();
     expect(screen.queryByPlaceholderText("Enter your name")).toBeNull();
   });
 
@@ -72,6 +73,17 @@ describe("startup and storage", () => {
     render(<App />);
     expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghana/ })).toBeTruthy();
     expect(localStorage.getItem(`${KEY}-unreadable`)).toBe(raw);
+  });
+
+  it("greeting counts only today's sessions and drops a zero hour", () => {
+    const s = (id: string, date: string, minutes: number) => ({ id, date, subjectId: "fr", topicId: "", topicName: "", minutes, note: "" });
+    localStorage.setItem(KEY, JSON.stringify({ topics: [], sessions: [s("a", ymd(new Date()), 20), s("b", ymd(new Date()), 25), s("c", "2020-01-01", 300)] }));
+    render(<App />);
+    expect(screen.getByText("You've studied 45m today.")).toBeTruthy();
+    cleanup();
+    localStorage.setItem(KEY, JSON.stringify({ topics: [], sessions: [s("d", ymd(new Date()), 240)] }));
+    render(<App />);
+    expect(screen.getByText("You've studied 4h today.")).toBeTruthy();
   });
 
   it("loads old saved data (with name/welcome fields) and wrong-typed lists", () => {
@@ -209,6 +221,7 @@ describe("user flows", () => {
     fireEvent.change(m, { target: { value: "30" } });
     fireEvent.click(screen.getByRole("button", { name: "Save session" }));
     expect(screen.getAllByText("2h 30m").length).toBeGreaterThan(0);
+    expect(screen.getByText("You've studied 2h 30m today.")).toBeTruthy();
     nav("Study Log");
     expect(JSON.parse(localStorage.getItem(KEY)!).sessions[0].date).toBe(ymd(new Date()));
     fireEvent.click(document.querySelector(".session-row .icon-btn")!);
