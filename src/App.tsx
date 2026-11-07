@@ -216,7 +216,7 @@ export default function App() {
     </aside>
     {mobileNav && <div className="scrim" onClick={() => setMobileNav(false)}/>}
     <main className="main">
-      <header className="topbar">{page !== "Dashboard" && <button className="icon-btn" aria-label="Back" title="Back" onClick={back}><ArrowLeft size={18}/></button>}<div className="top-actions"><span className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span><button className="avatar top-avatar" aria-label="Settings" onClick={() => go("Settings")}><img src="./avatar.jpg" alt=""/></button></div></header>
+      <header className="topbar">{page !== "Dashboard" && <button className="icon-btn" aria-label="Back" title="Back" onClick={back}><ArrowLeft size={18}/></button>}<div className="top-actions"><span className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div></header>
       <div className="content">
         {page === "Dashboard" && <Dashboard data={data} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
         {page === "Syllabus" && <Syllabus data={data} selected={selectedSubject} setSelected={setSelectedSubject} search={search} setSearch={setSearch} onAdd={() => setModal("topic")} onLoad={loadSyllabus} onUpdate={updateTopic} onDelete={id => update({topics:data.topics.filter(t=>t.id!==id)})}/>}
