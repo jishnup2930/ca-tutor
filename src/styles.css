@@ -120,7 +120,9 @@ h1, h2, h3 { margin: 0; letter-spacing: -.02em; }
 .section-heading .muted { margin-top: 2px; }
 
 /* ---------- Dashboard ---------- */
-.hello { margin: 4px 0 22px; }
+.hello { display: flex; align-items: flex-end; justify-content: flex-start; gap: 28px; margin: 4px 0 22px; position: relative; z-index: 2; }
+/* The figure's feet rest on the top edge of the note card below. */
+.hello-figure { height: 200px; width: auto; flex-shrink: 0; margin: -28px 0 -22px 0; filter: drop-shadow(0 10px 12px rgba(84, 96, 140, .22)); }
 .hello h1 { font-size: 36px; font-weight: 500; line-height: 1.15; }
 .hello h1 b { font-weight: 800; }
 .hello p { font-size: 22px; color: var(--ink-2); margin: 4px 0 0; letter-spacing: -.01em; }
@@ -374,6 +376,8 @@ input[type="radio"] { accent-color: var(--violet); width: 18px; height: 18px; }
   .date-chip { display: none; }
   .content { padding: 4px 16px 120px; }
   .hello h1 { font-size: 30px; }
+  .hello { margin-top: -8px; justify-content: space-between; gap: 12px; }
+  .hello-figure { height: 150px; margin: 0 4px -22px 0; }
   .hello p { font-size: 19px; }
   .page-title { flex-direction: column; align-items: stretch; margin-bottom: 18px; }
   .page-title h1 { font-size: 26px; }
