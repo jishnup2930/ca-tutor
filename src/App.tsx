@@ -210,13 +210,13 @@ export default function App() {
 
   return <div className="app-shell">
     <aside className={`sidebar ${mobileNav ? "show" : ""}`}>
-      <div className="profile-mini"><div className="avatar">{NAME[0]}</div><div><b>{NAME}</b><small>May 2027 attempt</small></div><button className="icon-btn close-nav" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
+      <div className="profile-mini"><div className="avatar"><img src="./avatar.jpg" alt=""/></div><div><b>{NAME}</b><small>May 2027 attempt</small></div><button className="icon-btn close-nav" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
       <nav>{nav.map(group => <div className="nav-group" key={group.label}><div className="nav-heading"><group.icon size={14}/>{group.label}</div>{group.items.map(item => <button key={item} className={`nav-item ${page === item ? "active" : ""}`} onClick={() => go(item)}>{item === "Dashboard" ? <Home/> : item === "Syllabus" ? <Layers/> : item === "Learn & Notes" ? <FileText/> : item === "Practice" ? <ClipboardList/> : item === "Flashcards" ? <Brain/> : item === "Revision" ? <RotateCcw/> : item === "Study Log" ? <Clock3/> : item === "Analytics" ? <Activity/> : <Settings/>}{item}</button>)}</div>)}</nav>
       <div className="sidebar-bottom"><p className="tiny muted">Made with love by Jishnu Pedengal</p><div className="exam-card"><b>CA Final, May 2027</b><small>Keep going. You've got this.</small></div></div>
     </aside>
     {mobileNav && <div className="scrim" onClick={() => setMobileNav(false)}/>}
     <main className="main">
-      <header className="topbar">{page !== "Dashboard" && <button className="icon-btn" aria-label="Back" title="Back" onClick={back}><ArrowLeft size={18}/></button>}<div className="top-actions"><span className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span><button className="avatar top-avatar" onClick={() => go("Settings")}>{NAME[0]}</button></div></header>
+      <header className="topbar">{page !== "Dashboard" && <button className="icon-btn" aria-label="Back" title="Back" onClick={back}><ArrowLeft size={18}/></button>}<div className="top-actions"><span className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span><button className="avatar top-avatar" aria-label="Settings" onClick={() => go("Settings")}><img src="./avatar.jpg" alt=""/></button></div></header>
       <div className="content">
         {page === "Dashboard" && <Dashboard data={data} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
         {page === "Syllabus" && <Syllabus data={data} selected={selectedSubject} setSelected={setSelectedSubject} search={search} setSearch={setSearch} onAdd={() => setModal("topic")} onLoad={loadSyllabus} onUpdate={updateTopic} onDelete={id => update({topics:data.topics.filter(t=>t.id!==id)})}/>}
