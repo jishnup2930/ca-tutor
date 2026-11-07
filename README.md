@@ -6,7 +6,7 @@ A personal, frontend-only CA Final preparation app built with React, Vite and Ty
 
 - Personal dashboard for Meghana with a different note from Jishnu each day (edit `QUOTES` in `src/App.tsx`)
 - Six CA Final paper areas (FR, AFM, Audit, DT, IDT and IBS)
-- Editable chapter/topic syllabus structure
+- ICAI chapter list for all six papers preloaded (FR, AFM, Audit, DT, IDT; IBS case-study areas), plus your own topics
 - Topic progress, difficulty, notes and resource links
 - Learning workspace and personal notes library
 - User-managed MCQ bank with answer explanations and practice mode
@@ -104,4 +104,4 @@ jobs:
 
 ## Current scope / future enhancements
 
-This is a complete working starter application with functional local CRUD and tracking flows. It does not ship with a populated official ICAI syllabus, copyrighted ICAI PDFs, a verified exam question bank, automatic PDF parsing, cross-device sync, notifications or timed mock-exam engine. Those should be added using verified source material and tested separately.
+This is a complete working starter application with functional local CRUD and tracking flows. It ships with the ICAI chapter titles for each paper (`src/syllabus.ts`, sources listed there; re-check them against ICAI's applicability list for each attempt). It does not include copyrighted ICAI PDFs, a verified exam question bank, automatic PDF parsing, cross-device sync, notifications or timed mock-exam engine. Those should be added using verified source material and tested separately.

@@ -4,8 +4,9 @@ import {
   Activity, ArrowDownToLine, ArrowUpFromLine, BookOpen, Bookmark, Brain,
   CalendarDays, Check, ChevronDown, ChevronRight, CircleHelp, Clock3,
   FileText, GraduationCap, Home, Layers, ListChecks, Menu, Plus, Search,
-  Settings, Sparkles, Target, Trash2, Upload, X, ClipboardList, RotateCcw
+  Settings, Sparkles, Target, Trash2, Upload, X, ClipboardList, RotateCcw, ArrowLeft
 } from "lucide-react";
+import { SYLLABUS } from "./syllabus";
 
 type Subject = { id: string; name: string; code: string; group: string; color: string; };
 type Topic = { id: string; subjectId: string; chapter: string; name: string; status: "Not started" | "Learning" | "Completed"; difficulty: "Easy" | "Medium" | "Difficult"; notes: string; resource: string; };
@@ -62,6 +63,12 @@ export const QUOTES = [
   "The finish line is coming closer every day. I'll be there with you. ❤️"
 ];
 
+const PAGES = ["Dashboard", "Syllabus", "Learn & Notes", "Practice", "Flashcards", "Revision", "Study Log", "Analytics", "Settings"];
+const pageFromUrl = () => {
+  try { const p = decodeURIComponent(location.hash.slice(1)); return PAGES.includes(p) ? p : "Dashboard"; }
+  catch { return "Dashboard"; } // malformed link
+};
+
 const LISTS = ["topics", "sessions", "notes", "questions", "flashcards", "revisions"] as const;
 const emptyState: State = { subjects, topics: [], sessions: [], notes: [], questions: [], flashcards: [], revisions: [] };
 
@@ -93,13 +100,16 @@ export const normalise = (raw: unknown): State => {
 };
 // Keep unreadable or partly invalid data aside instead of letting the next save overwrite it.
 const keepAside = (raw: string | null) => { try { if (raw) localStorage.setItem(`${KEY}-unreadable`, raw); } catch { /* storage blocked */ } };
+// Every ICAI chapter as a topic. New installs start with these; "Load ICAI chapters" adds any missing ones.
+export const syllabusTopics = (): Topic[] => Object.entries(SYLLABUS).flatMap(([subjectId, groups]) => groups.flatMap(([chapter, names]) =>
+  names.map(name => ({ id: uid(), subjectId, chapter, name, status: "Not started" as const, difficulty: "Medium" as const, notes: "", resource: "" }))));
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const today = () => ymd(new Date());
 const readState = (): State => {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(KEY);
-    if (!raw) return emptyState;
+    if (!raw) return { ...emptyState, topics: syllabusTopics() };
     const parsed = JSON.parse(raw);
     const s = normalise(parsed);
     if (LISTS.some(k => s[k].length !== (Array.isArray(parsed?.[k]) ? parsed[k].length : 0))) keepAside(raw);
@@ -110,7 +120,7 @@ const fmtHours = (mins: number) => `${Math.floor(mins / 60)}h ${mins % 60}m`;
 
 export default function App() {
   const [data, setData] = useState<State>(readState);
-  const [page, setPage] = useState("Dashboard");
+  const [page, setPage] = useState(pageFromUrl);
   const [selectedSubject, setSelectedSubject] = useState("fr");
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState("");
@@ -136,12 +146,31 @@ export default function App() {
   const totalMinutes = data.sessions.reduce((n, s) => n + s.minutes, 0);
   const completedTopics = data.topics.filter(t => t.status === "Completed").length;
   const progress = data.topics.length ? Math.round(completedTopics / data.topics.length * 100) : 0;
-  const go = (name: string) => { setPage(name); setMobileNav(false); };
+  // Each page gets a browser history entry, so the phone/browser back button moves between pages.
+  const go = (name: string) => {
+    setMobileNav(false);
+    if (name === page) return;
+    history.pushState({ app: true }, "", `#${encodeURIComponent(name)}`);
+    setPage(name);
+  };
+  // Back inside the app; if this page was opened directly (no in-app history), go to the dashboard instead of leaving.
+  const back = () => history.state?.app ? history.back() : go("Dashboard");
+  useEffect(() => {
+    const onPop = () => { setPage(pageFromUrl()); setModal(""); setMobileNav(false); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const addTopic = (chapter: string, name: string) => {
     if (!name.trim()) return;
     update({ topics: [...data.topics, { id: uid(), subjectId: selectedSubject, chapter: chapter.trim() || "Uncategorised", name: name.trim(), status: "Not started", difficulty: "Medium", notes: "", resource: "" }] });
     setModal(""); notify("Topic added");
+  };
+  const loadSyllabus = () => {
+    const have = new Set(data.topics.map(t => `${t.subjectId}|${t.name}`));
+    const add = syllabusTopics().filter(t => !have.has(`${t.subjectId}|${t.name}`));
+    if (add.length) update({ topics: [...data.topics, ...add] });
+    notify(add.length ? `Added ${add.length} ICAI chapters` : "All ICAI chapters are already in your syllabus");
   };
   const updateTopic = (id: string, patch: Partial<Topic>) => update({ topics: data.topics.map(t => t.id === id ? { ...t, ...patch } : t) });
   const addSession = (payload: Omit<Session, "id">) => {
@@ -177,17 +206,16 @@ export default function App() {
 
   return <div className="app-shell">
     <aside className={`sidebar ${mobileNav ? "show" : ""}`}>
-      <div className="brand"><div className="brand-mark small"><GraduationCap size={19}/></div><div><b>Study Companion</b><small>CA FINAL · MAY 2027</small></div><button className="icon-btn close-nav" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
-      <div className="profile-mini"><div className="avatar">{NAME[0]}</div><div><b>{NAME}</b><small>May 2027 attempt</small></div></div>
+      <div className="profile-mini"><div className="avatar">{NAME[0]}</div><div><b>{NAME}</b><small>May 2027 attempt</small></div><button className="icon-btn close-nav" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
       <nav>{nav.map(group => <div className="nav-group" key={group.label}><div className="nav-heading"><group.icon size={14}/>{group.label}</div>{group.items.map(item => <button key={item} className={`nav-item ${page === item ? "active" : ""}`} onClick={() => go(item)}>{item === "Dashboard" ? <Home/> : item === "Syllabus" ? <Layers/> : item === "Learn & Notes" ? <FileText/> : item === "Practice" ? <ClipboardList/> : item === "Flashcards" ? <Brain/> : item === "Revision" ? <RotateCcw/> : item === "Study Log" ? <Clock3/> : item === "Analytics" ? <Activity/> : <Settings/>}{item}</button>)}</div>)}</nav>
-      <div className="sidebar-bottom"><div className="exam-card"><span className="tiny">YOUR EXAM GOAL</span><b>CA Final</b><small>May 2027 · Keep going!</small></div><p className="tiny muted">Made with care · Your pace, your journey</p></div>
+      <div className="sidebar-bottom"><p className="tiny muted">Made with love by Jishnu</p><div className="exam-card"><span className="tiny">YOUR EXAM GOAL</span><b>CA Final</b><small>May 2027 · Keep going!</small></div></div>
     </aside>
     {mobileNav && <div className="scrim" onClick={() => setMobileNav(false)}/>}
     <main className="main">
-      <header className="topbar"><button className="icon-btn mobile-menu" onClick={() => setMobileNav(true)}><Menu/></button><div className="breadcrumb">Study Companion <ChevronRight size={14}/><b>{page}</b></div><div className="top-actions"><span className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span><button className="avatar top-avatar" onClick={() => go("Settings")}>{NAME[0]}</button></div></header>
+      <header className="topbar"><button className="icon-btn mobile-menu" aria-label="Open menu" onClick={() => setMobileNav(true)}><Menu/></button>{page !== "Dashboard" && <button className="icon-btn" aria-label="Back" title="Back" onClick={back}><ArrowLeft size={18}/></button>}<div className="breadcrumb"><b>{page}</b></div><div className="top-actions"><span className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span><button className="avatar top-avatar" onClick={() => go("Settings")}>{NAME[0]}</button></div></header>
       <div className="content">
         {page === "Dashboard" && <Dashboard data={data} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
-        {page === "Syllabus" && <Syllabus data={data} selected={selectedSubject} setSelected={setSelectedSubject} search={search} setSearch={setSearch} onAdd={() => setModal("topic")} onUpdate={updateTopic} onDelete={id => update({topics:data.topics.filter(t=>t.id!==id)})}/>}
+        {page === "Syllabus" && <Syllabus data={data} selected={selectedSubject} setSelected={setSelectedSubject} search={search} setSearch={setSearch} onAdd={() => setModal("topic")} onLoad={loadSyllabus} onUpdate={updateTopic} onDelete={id => update({topics:data.topics.filter(t=>t.id!==id)})}/>}
         {page === "Learn & Notes" && <Learn data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAddNote={note => {update({notes:[...data.notes,note]});notify("Note saved");}} onDeleteNote={id => update({notes:data.notes.filter(n=>n.id!==id)})} onUpdateTopic={updateTopic}/>}
         {page === "Practice" && <Practice data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAdd={q => {update({questions:[...data.questions,q]});notify("Question added");}}/>}
         {page === "Flashcards" && <Flashcards data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAdd={f => {update({flashcards:[...data.flashcards,f]});notify("Flashcard added");}} onDelete={id=>update({flashcards:data.flashcards.filter(f=>f.id!==id)})}/>}
@@ -232,15 +260,15 @@ function Empty({text}:{text:string}){return <div className="empty"><div classNam
 function SubjectPicker({selected,setSelected}:{selected:string;setSelected:(s:string)=>void}) {
   return <div className="subject-tabs">{subjects.map(s=><button key={s.id} className={selected===s.id?"selected":""} onClick={()=>setSelected(s.id)}>{s.code.split(" · ")[1]}</button>)}</div>;
 }
-function Syllabus({data,selected,setSelected,search,setSearch,onAdd,onUpdate,onDelete}:{data:State;selected:string;setSelected:(s:string)=>void;search:string;setSearch:(s:string)=>void;onAdd:()=>void;onUpdate:(id:string,p:Partial<Topic>)=>void;onDelete:(id:string)=>void}) {
+function Syllabus({data,selected,setSelected,search,setSearch,onAdd,onLoad,onUpdate,onDelete}:{data:State;selected:string;setSelected:(s:string)=>void;search:string;setSearch:(s:string)=>void;onAdd:()=>void;onLoad:()=>void;onUpdate:(id:string,p:Partial<Topic>)=>void;onDelete:(id:string)=>void}) {
   const list=data.topics.filter(t=>t.subjectId===selected&&`${t.name} ${t.chapter}`.toLowerCase().includes(search.toLowerCase()));
   const groups=[...new Set(list.map(t=>t.chapter))];
   const sub=subjects.find(s=>s.id===selected)!;
-  return <><PageTitle eyebrow="STUDY MAP" title="Syllabus" desc="Build your own chapter-wise study map using the applicable ICAI syllabus." action={<button className="primary" onClick={onAdd}><Plus size={17}/> Add topic</button>}/>
-    <div className="info-strip"><CircleHelp size={17}/><span>Chapter lists are intentionally editable. Add the official May 2027 syllabus topics or import your own structured syllabus. This app does not assume an unverified chapter list.</span></div>
+  return <><PageTitle eyebrow="STUDY MAP" title="Syllabus" desc="Track every chapter of the ICAI syllabus, and add your own topics." action={<div className="title-actions"><button className="secondary" onClick={onLoad}><ListChecks size={17}/> Load ICAI chapters</button><button className="primary" onClick={onAdd}><Plus size={17}/> Add topic</button></div>}/>
+    <div className="info-strip"><CircleHelp size={17}/><span>Chapters are from ICAI's Board of Studies study material (May 2027 editions; AFM uses the May 2026 edition until ICAI publishes a newer one). IBS is a case-study paper with no chapters. Check ICAI's applicability list for your attempt.</span></div>
     <SubjectPicker selected={selected} setSelected={setSelected}/>
     <div className="toolbar"><div><h2>{sub.name}</h2><p className="muted">{sub.group} · {list.length} topics added</p></div><div className="search-box"><Search size={16}/><input placeholder="Search chapters or topics" value={search} onChange={e=>setSearch(e.target.value)}/></div></div>
-    {groups.length?groups.map(g=><div className="chapter-block" key={g}><div className="chapter-head"><b>{g}</b><span>{list.filter(t=>t.chapter===g&&t.status==="Completed").length}/{list.filter(t=>t.chapter===g).length} completed</span></div>{list.filter(t=>t.chapter===g).map(t=><div className="topic-row" key={t.id}><div className={`topic-check ${t.status==="Completed"?"done":""}`} onClick={()=>onUpdate(t.id,{status:t.status==="Completed"?"Learning":"Completed"})}>{t.status==="Completed"&&<Check size={13}/>}</div><div className="grow"><b>{t.name}</b><small>{t.difficulty} · {t.status}</small></div><select value={t.status} onChange={e=>onUpdate(t.id,{status:e.target.value as Topic["status"]})}><option>Not started</option><option>Learning</option><option>Completed</option></select><button className="icon-btn danger-hover" onClick={()=>onDelete(t.id)} title="Delete topic"><Trash2 size={16}/></button></div>)}</div>):<div className="empty-large"><div className="empty-icon"><Layers size={24}/></div><h3>Start building your syllabus</h3><p>Add the chapters and topics from the applicable ICAI study material. You can organise each subject into chapters and track every topic.</p><button className="primary" onClick={onAdd}><Plus size={17}/> Add your first topic</button><a href="https://boslive.icai.org/" target="_blank" rel="noreferrer">Open official ICAI BoS portal <ChevronRight size={14}/></a></div>}
+    {groups.length?groups.map(g=><div className="chapter-block" key={g}><div className="chapter-head"><b>{g}</b><span>{list.filter(t=>t.chapter===g&&t.status==="Completed").length}/{list.filter(t=>t.chapter===g).length} completed</span></div>{list.filter(t=>t.chapter===g).map(t=><div className="topic-row" key={t.id}><div className={`topic-check ${t.status==="Completed"?"done":""}`} onClick={()=>onUpdate(t.id,{status:t.status==="Completed"?"Learning":"Completed"})}>{t.status==="Completed"&&<Check size={13}/>}</div><div className="grow"><b>{t.name}</b><small>{t.difficulty} · {t.status}</small></div><select value={t.status} onChange={e=>onUpdate(t.id,{status:e.target.value as Topic["status"]})}><option>Not started</option><option>Learning</option><option>Completed</option></select><button className="icon-btn danger-hover" onClick={()=>onDelete(t.id)} title="Delete topic"><Trash2 size={16}/></button></div>)}</div>):<div className="empty-large"><div className="empty-icon"><Layers size={24}/></div><h3>No chapters here yet</h3><p>Load the ICAI chapter list for every paper in one click, or add your own topics.</p><button className="primary" onClick={onLoad}><ListChecks size={17}/> Load ICAI chapters</button><a href="https://boslive.icai.org/" target="_blank" rel="noreferrer">Open official ICAI BoS portal <ChevronRight size={14}/></a></div>}
   </>;
 }
 

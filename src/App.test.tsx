@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import App, { QUOTES, dailyQuote, normalise, ymd } from "./App";
+import App, { QUOTES, dailyQuote, normalise, syllabusTopics, ymd } from "./App";
 
 const KEY = "ca-final-companion-v1";
 const nav = (label: string) => fireEvent.click(screen.getByRole("button", { name: label }));
@@ -16,7 +16,8 @@ const addTopic = (chapter: string, name: string) => {
   fireEvent.click(lastButton("Add topic"));
 };
 
-beforeEach(() => localStorage.clear());
+// Most tests start from an empty saved state (a fresh install would preload the ICAI chapters).
+beforeEach(() => { localStorage.clear(); localStorage.setItem(KEY, "{}"); history.replaceState(null, "", "/"); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("helpers", () => {
@@ -101,6 +102,76 @@ describe("every page renders", () => {
     render(<App />);
     nav(label);
     expect(screen.getByRole("heading", { level: 1, name: heading })).toBeTruthy();
+  });
+});
+
+describe("ICAI syllabus", () => {
+  it("has the expected number of chapters per paper, with no duplicates", () => {
+    const t = syllabusTopics();
+    const count = (id: string) => t.filter(x => x.subjectId === id).length;
+    expect([count("fr"), count("afm"), count("audit"), count("dt"), count("idt"), count("ibs")]).toEqual([17, 15, 19, 28, 32, 7]);
+    expect(new Set(t.map(x => `${x.subjectId}|${x.name}`)).size).toBe(t.length);
+    expect(new Set(t.map(x => x.id)).size).toBe(t.length);
+    expect(t.every(x => normalise({ topics: [x] }).topics.length === 1)).toBe(true); // valid topics
+  });
+
+  it("a fresh install starts with every chapter loaded", () => {
+    localStorage.clear();
+    render(<App />);
+    expect(JSON.parse(localStorage.getItem(KEY)!).topics).toHaveLength(118);
+    nav("Syllabus");
+    expect(screen.getByText("1. Introduction to Indian Accounting Standards")).toBeTruthy();
+  });
+
+  it("Load ICAI chapters adds only missing ones and keeps her own topics and progress", () => {
+    render(<App />);
+    addTopic("My chapter", "My own topic");
+    fireEvent.click(screen.getAllByRole("button", { name: /Load ICAI chapters/ })[0]);
+    expect(screen.getByText("Added 118 ICAI chapters")).toBeTruthy();
+    const first = document.querySelectorAll(".topic-check")[1] as HTMLElement; // an ICAI chapter
+    fireEvent.click(first);
+    fireEvent.click(screen.getAllByRole("button", { name: /Load ICAI chapters/ })[0]);
+    expect(screen.getByText("All ICAI chapters are already in your syllabus")).toBeTruthy();
+    const topics = JSON.parse(localStorage.getItem(KEY)!).topics;
+    expect(topics).toHaveLength(119);
+    expect(topics.filter((t: { status: string }) => t.status === "Completed")).toHaveLength(1);
+  });
+});
+
+describe("navigation and back button", () => {
+  const h1 = (name: string | RegExp) => screen.findByRole("heading", { level: 1, name });
+
+  it("in-app Back button returns to the previous page", async () => {
+    render(<App />);
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull(); // none on the dashboard
+    nav("Syllabus");
+    nav("Practice");
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await h1("Syllabus")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await h1(/Welcome/)).toBeTruthy();
+  });
+
+  it("browser/phone back button moves between pages", async () => {
+    render(<App />);
+    nav("Flashcards");
+    expect(location.hash).toBe("#Flashcards");
+    history.back();
+    expect(await h1(/Welcome/)).toBeTruthy();
+  });
+
+  it("opening a page link directly works, and Back then goes to the dashboard", async () => {
+    history.replaceState(null, "", "/#Study%20Log");
+    render(<App />);
+    expect(screen.getByRole("heading", { level: 1, name: "Study log" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await h1(/Welcome/)).toBeTruthy();
+  });
+
+  it.each(["#%E0", "#Nonsense"])("a bad link (%s) opens the dashboard", hash => {
+    history.replaceState(null, "", `/${hash}`);
+    render(<App />);
+    expect(screen.getByRole("heading", { level: 1, name: /Welcome/ })).toBeTruthy();
   });
 });
 
