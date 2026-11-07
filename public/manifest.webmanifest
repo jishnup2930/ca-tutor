@@ -1,0 +1,9 @@
+{
+  "name": "CA Final Study Companion",
+  "short_name": "Study Companion",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "description": "A personal space to learn, practise and revise for CA Final."
+}
