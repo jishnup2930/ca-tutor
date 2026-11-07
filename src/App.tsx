@@ -240,7 +240,7 @@ function Dashboard({data,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data
   const next = data.revisions.filter(r=>!r.done).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
   const lastTopic = [...data.sessions].sort((a,b)=>b.date.localeCompare(a.date))[0];
   return <><PageTitle eyebrow="YOUR STUDY SPACE" title={`Welcome, ${NAME}! 👋`} desc="Small, consistent steps add up. Pick up where you left off." action={<button className="primary" onClick={onAdd}><Plus size={17}/> Log study time</button>}/>
-    <div className="personal-note"><div className="note-heart">♡</div><div><b>Today's note</b><p>{dailyQuote(new Date())}</p><p>— Jishnu</p></div></div>
+    <div className="personal-note"><div className="note-heart" aria-hidden="true">♥</div><div><b>Today's note</b><p>{dailyQuote(new Date())}</p><p className="note-sign">— Jishnu</p></div></div>
     <div className="stats-grid">
       <Stat icon={<Clock3/>} label="Total study time" value={fmtHours(totalMinutes)} sub="All recorded sessions"/>
       <Stat icon={<Layers/>} label="Topics completed" value={`${data.topics.filter(t=>t.status==="Completed").length}`} sub={`${data.topics.length} topics added`}/>
