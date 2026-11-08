@@ -4,7 +4,7 @@ A personal, frontend-only CA Final preparation app built with React, Vite and Ty
 
 ## Included
 
-- Personal dashboard for Meghana with a different note from Jishnu Pedengal each day (edit `QUOTES` in `src/App.tsx`)
+- Personal dashboard for Meghana with notes from Jishnu Pedengal, shown in order: the next one on every refresh and each new day (100 notes in `QUOTES` in `src/App.tsx`)
 - Six CA Final paper areas (FR, AFM, Audit, DT, IDT and IBS)
 - ICAI chapter list for all six papers preloaded (FR, AFM, Audit, DT, IDT; IBS case-study areas), plus your own topics
 - Topic progress, difficulty, notes and resource links

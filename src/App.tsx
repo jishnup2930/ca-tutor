@@ -1,8 +1,7 @@
-
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Activity, ArrowDownToLine, ArrowUpFromLine, BookOpen, Bookmark, Brain,
-  CalendarDays, Check, ChevronDown, ChevronRight, CircleHelp, Clock3,
+  Activity, ArrowDownToLine, ArrowUpFromLine, BookOpen, Brain,
+  CalendarDays, Check, ChevronRight, CircleHelp, Clock3,
   FileText, GraduationCap, Home, Layers, ListChecks, Menu, Plus, Search,
   Settings, Sparkles, Trash2, X, ClipboardList, RotateCcw, ArrowLeft,
   Star, TrendingUp, ShieldCheck, Landmark, Receipt, Briefcase
@@ -32,7 +31,7 @@ const tint = (c: string) => ({ "--c": c }) as React.CSSProperties;
 
 const NAME = "Meghana";
 
-// Jishnu Pedengal's notes: one is shown per day, cycling through the list. Add or edit freely.
+// Jishnu Pedengal's notes, shown in list order: the next one on every page load or refresh, and on each new day. Add or edit freely.
 export const QUOTES = [
   "You're not alone in this journey. I'm with you, cheering you on every step of the way. ❤️",
   "One day at a time, one topic at a time. You're doing better than you think.",
@@ -64,7 +63,76 @@ export const QUOTES = [
   "You're building something that will last a lifetime. Keep stacking those bricks.",
   "I believe in you more than you know. Keep going, superstar.",
   "Consistency beats intensity. Just keep showing up, and you will make it.",
-  "The finish line is coming closer every day. I'll be there with you. ❤️"
+  "The finish line is coming closer every day. I'll be there with you. ❤️",
+  "Every chapter you finish is a step closer to the CA you're becoming. I'm so proud of you.",
+  "Open the book for just ten minutes. I promise the rest gets easier once you start.",
+  "You don't have to feel ready. You just have to begin, and I'll be cheering the whole way.",
+  "One more illustration solved today is one more mark waiting for you in the exam.",
+  "The hard chapters are where the marks hide. Go find them, superstar. ❤️",
+  "Study a little today, so the exam hall feels like revision. You'll walk in so ready.",
+  "Don't count the hours. Make the hours count. I believe in every one of them.",
+  "Every tough question today makes exam day a little easier. I'm proud of you for not giving up.",
+  "Ind AS looks scary until the second read. Go for round two. You've got this.",
+  "Got an MCQ wrong? Perfect. Now you'll never forget the right answer.",
+  "Somewhere ahead is Meghana, CA. Every hour today brings you closer to her. ❤️",
+  "Even a short session counts. Log today's, however small, and let me be proud of it.",
+  "Understand it, don't just memorise it. The marks follow understanding.",
+  "Today's discipline is exam day's confidence. Keep going, Meghana.",
+  "Tired? Rest for a bit, then come back and finish just one more topic.",
+  "You've cleared hard exams before. This is simply the next one on your list.",
+  "Phone face down, timer on, one chapter. Let's do this together.",
+  "Write it, solve it, revise it. That's how it stays with you.",
+  "The notes you make today will be your best friend during revision.",
+  "You're so good at showing up, even on the hard days. That's what will carry you. ❤️",
+  "Start with the topic you've been avoiding. Everything after it feels lighter.",
+  "Each revision cycle makes the next one faster. Keep those cycles turning.",
+  "You're not behind. You're on your own path, and you're moving forward.",
+  "Start small, start now. I'll be cheering from the sidelines. ❤️",
+  "Write down every doubt today. Tomorrow's answers start with today's questions.",
+  "The syllabus is big, but it's finite. Tick off one more chapter today.",
+  "GST makes sense once you see the pattern. You're great at spotting patterns, so go find it.",
+  "Audit is a story about evidence. Read it like one today, and tell me the best bit later.",
+  "Don't wait for motivation. Start, and it will catch up with you.",
+  "Studying on the days you don't feel like it is what makes you stand out.",
+  "Practise writing answers, not just reading them. You know more than you think; let the page see it.",
+  "Past papers are never wasted time. Try one today, and be proud of it whatever the score.",
+  "Set one goal for today and finish it. That's a really good day.",
+  "When a concept finally clicks, write it in your own words before it slips away.",
+  "You've done harder things than this chapter. You'll get through this one too. ❤️",
+  "Every focused hour is an investment that pays back in the exam hall.",
+  "Be proud of the work you've already done. Then add a little more today.",
+  "Focus on your own page today. That's the only one that matters, and you're writing it beautifully.",
+  "Tax law rewards precision. Slow down today; being careful is your superpower.",
+  "Break the chapter into small pieces. Finish the first piece right now.",
+  "A short revision today saves a long one later. Future you says thank you.",
+  "Every bit of preparation builds your confidence. I can already see how much you've grown.",
+  "Today, understand one thing better than you did yesterday. That's enough.",
+  "Ten minutes on yesterday's topic before a new one. You'll be amazed how much you remember.",
+  "AFM numbers get friendly once you've solved enough of them. Solve a few more.",
+  "The pressure you feel means it matters to you. Use it to focus.",
+  "Write one formula from memory today. I believe in that brilliant brain of yours.",
+  "Learning feels uncomfortable before it feels easy. Stay with it a little longer.",
+  "Do one timed question today. You'll be surprised how fast you're getting.",
+  "Read the question twice, answer once. I've seen how sharp you are when you slow down.",
+  "Make your notes so clear that revision feels easy. Future you will be so grateful.",
+  "Take the break, but set an alarm for when it ends. I'll be cheering when you're back at it.",
+  "Sleep is part of the study plan. Rest well tonight, you've earned it. ❤️",
+  "Slow days still count. Progress is progress.",
+  "You're closer today than you were yesterday. Always remember that.",
+  "Explain today's concept as if you're teaching me. If I get it, you've definitely got it.",
+  "One focused hour beats three distracted ones. Give me one good hour today. ❤️",
+  "Turn 'I can't' into 'I can't yet', and then let's work on the 'yet'.",
+  "The dream you started with is still worth every hour you give it.",
+  "Try one case study today. Each one sharpens the way you think.",
+  "Be patient with yourself. Mastery takes repetition, not perfection.",
+  "One bad day doesn't undo many good ones. Begin again today. ❤️",
+  "Revise with questions, not just rereading. It sticks better, and you'll feel the difference.",
+  "Give your hardest topics the best hours of your day. You're more than a match for them.",
+  "Done is better than perfect. Finish the chapter, polish it in revision.",
+  "Every topic you master is yours for life, not just for the exam.",
+  "When it feels hard, it means you're learning. One more page.",
+  "Keep showing up for yourself. That's the whole secret.",
+  "I'm proud of every single hour you put in. Let's add one more today. ❤️"
 ];
 
 const PAGES = ["Dashboard", "Syllabus", "Learn & Notes", "Practice", "Flashcards", "Revision", "Study Log", "Analytics", "Settings"];
@@ -79,8 +147,22 @@ const emptyState: State = { subjects, topics: [], sessions: [], notes: [], quest
 const KEY = "ca-final-companion-v1";
 // Local YYYY-MM-DD; toISOString() would give the UTC date (yesterday in IST before 05:30).
 export const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-// Same note all day, a different one the next day (indexed by local calendar day).
-export const dailyQuote = (d: Date) => QUOTES[Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000) % QUOTES.length];
+// Which note is showing and on what day; kept apart from study data so backups stay unchanged.
+type QuoteState = { i: number; day: string };
+const QUOTE_KEY = "ca-final-companion-quote";
+export const nextQuote = (prev: QuoteState | null, day: string): QuoteState => ({ i: prev ? (prev.i + 1) % QUOTES.length : 0, day });
+const readQuote = (): QuoteState | null => {
+  try { const q = JSON.parse(localStorage.getItem(QUOTE_KEY) || "null"); return q && Number.isInteger(q.i) && q.i >= 0 && typeof q.day === "string" ? q : null; }
+  catch { return null; }
+};
+// Advance to the next note and remember it; without saved state, carry on from the note on screen.
+export const advanceQuote = (current?: QuoteState): QuoteState => {
+  const q = nextQuote(readQuote() ?? current ?? null, ymd(new Date()));
+  try { localStorage.setItem(QUOTE_KEY, JSON.stringify(q)); } catch { /* storage blocked */ }
+  return q;
+};
+// Once per page load, so moving between pages inside the app doesn't change the note.
+let loadQuote: QuoteState | undefined;
 // Field types each item needs for the pages to render; anything else in a store/backup is dropped.
 const REQUIRED: Record<typeof LISTS[number], Record<string, string>> = {
   topics: { id: "string", subjectId: "string", chapter: "string", name: "string", status: "string", difficulty: "string" },
@@ -130,6 +212,16 @@ export default function App() {
   const [modal, setModal] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [toast, setToast] = useState("");
+  const [quote, setQuote] = useState(() => (loadQuote ??= advanceQuote()));
+  // A phone may resume the app the next morning without reloading; give it the next note on a new day.
+  useEffect(() => {
+    const onShow = () => {
+      if (document.visibilityState !== "visible" || loadQuote?.day === ymd(new Date())) return;
+      loadQuote = advanceQuote(loadQuote); setQuote(loadQuote);
+    };
+    document.addEventListener("visibilitychange", onShow);
+    return () => document.removeEventListener("visibilitychange", onShow);
+  }, []);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -144,9 +236,6 @@ export default function App() {
 
   const update = (patch: Partial<State>) => setData(prev => ({ ...prev, ...patch }));
   const notify = (message: string) => setToast(message);
-  const currentSubject = subjects.find(s => s.id === selectedSubject)!;
-  const topicById = (id: string) => data.topics.find(t => t.id === id);
-  const subjectTopics = data.topics.filter(t => t.subjectId === selectedSubject);
   const totalMinutes = data.sessions.reduce((n, s) => n + s.minutes, 0);
   const completedTopics = data.topics.filter(t => t.status === "Completed").length;
   const progress = data.topics.length ? Math.round(completedTopics / data.topics.length * 100) : 0;
@@ -219,7 +308,7 @@ export default function App() {
     <main className="main">
       <header className="topbar">{page !== "Dashboard" && <button className="icon-btn" aria-label="Back" title="Back" onClick={back}><ArrowLeft size={18}/></button>}<div className="top-actions"><span className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div></header>
       <div className="content">
-        {page === "Dashboard" && <Dashboard data={data} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
+        {page === "Dashboard" && <Dashboard data={data} quote={QUOTES[quote.i]} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
         {page === "Syllabus" && <Syllabus data={data} selected={selectedSubject} setSelected={setSelectedSubject} search={search} setSearch={setSearch} onAdd={() => setModal("topic")} onLoad={loadSyllabus} onUpdate={updateTopic} onDelete={id => update({topics:data.topics.filter(t=>t.id!==id)})}/>}
         {page === "Learn & Notes" && <Learn data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAddNote={note => {update({notes:[...data.notes,note]});notify("Note saved");}} onDeleteNote={id => update({notes:data.notes.filter(n=>n.id!==id)})} onUpdateTopic={updateTopic}/>}
         {page === "Practice" && <Practice data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAdd={q => {update({questions:[...data.questions,q]});notify("Question added");}}/>}
@@ -266,7 +355,7 @@ const QUICK = [
   { page: "Revision", label: "Revision", Icon: RotateCcw, color: "var(--orange)" },
   { page: "Learn & Notes", label: "Learn & Notes", Icon: FileText, color: "var(--blue)" }
 ];
-function Dashboard({data,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data:State;totalMinutes:number;progress:number;onNavigate:(s:string)=>void;onAdd:()=>void;onSubject:(id:string)=>void}) {
+function Dashboard({data,quote,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data:State;quote:string;totalMinutes:number;progress:number;onNavigate:(s:string)=>void;onAdd:()=>void;onSubject:(id:string)=>void}) {
   const next = data.revisions.filter(r=>!r.done).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
   const lastTopic = [...data.sessions].sort((a,b)=>b.date.localeCompare(a.date))[0];
   const done = data.topics.filter(t=>t.status==="Completed").length;
@@ -275,7 +364,7 @@ function Dashboard({data,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data
   return <>
     <section className="hello"><div><h1>Hi, <b>{NAME}</b></h1><p>{todayMins ? `You've studied ${fmtHours(todayMins).replace(/^0h /, "").replace(/ 0m$/, "")} today.` : "Ready for today's first session?"}</p></div><img className="hello-figure" src="./meghana-figure.webp" alt="" width={210} height={560}/></section>
     <div className="dash-top">
-      <section className="personal-note"><div className="note-body"><h2>Today's note</h2><p className="note-text">{dailyQuote(new Date())}</p><p className="note-sign">— Jishnu Pedengal</p><button className="primary" onClick={onAdd}><Plus size={18}/> Log study time</button></div><HeartArt/></section>
+      <section className="personal-note"><div className="note-body"><h2>A little love note</h2><p className="note-text">{quote}</p><p className="note-sign">With love, Jishnu Pedengal</p><button className="primary" onClick={onAdd}><Plus size={18}/> Log study time</button></div><HeartArt/></section>
       <button className="progress-card" onClick={()=>onNavigate("Syllabus")}>
         <div className="pc-head"><div><span className="pc-icon"><Layers size={18}/></span><b>Syllabus progress</b><small>{done} of {data.topics.length} chapters done</small></div><div className="pc-big">{progress}<span>%</span></div></div>
         <div className="slider"><span style={{width:`${progress}%`}}/></div>
@@ -291,7 +380,7 @@ function Dashboard({data,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data
     </div>
     <div className="section-heading"><div><h2>Your papers</h2><p className="muted">Open a paper to see its chapters.</p></div><button className="text-btn" onClick={()=>onNavigate("Syllabus")}>View syllabus <ChevronRight size={16}/></button></div>
     <div className="subject-grid">{data.subjects.map(s=>{const st=paper(s.id);const Icon=SUBJECT_ICON[s.id]??BookOpen;return <button className="subject-card" key={s.id} onClick={()=>onSubject(s.id)}><span className="chip soft" style={tint(s.color)}><Icon/></span><div className="grow"><b>{s.name}</b><small>{st.done} of {st.all} chapters done</small><div className="subject-progress"><span style={{width:`${st.pct}%`,background:s.color}}/></div></div><span className="pct">{st.pct}%</span></button>})}</div>
-    <div className="two-col dashboard-bottom"><section className="panel"><div className="panel-head"><div><h2>Continue learning</h2><p className="muted">Your latest study session</p></div><button className="text-btn" onClick={()=>onNavigate("Study Log")}>View all</button></div>{lastTopic?<div className="continue-row"><div className="soft-icon"><BookOpen/></div><div className="grow"><b>{lastTopic.topicName||"Study session"}</b><small>{data.subjects.find(s=>s.id===lastTopic.subjectId)?.name}, {lastTopic.date}</small></div><b>{fmtHours(lastTopic.minutes)}</b></div>:<Empty text="Your study sessions will appear here once you log your first session."/>}</section>
+    <div className="two-col"><section className="panel"><div className="panel-head"><div><h2>Continue learning</h2><p className="muted">Your latest study session</p></div><button className="text-btn" onClick={()=>onNavigate("Study Log")}>View all</button></div>{lastTopic?<div className="continue-row"><div className="soft-icon"><BookOpen/></div><div className="grow"><b>{lastTopic.topicName||"Study session"}</b><small>{data.subjects.find(s=>s.id===lastTopic.subjectId)?.name}, {lastTopic.date}</small></div><b>{fmtHours(lastTopic.minutes)}</b></div>:<Empty text="Your study sessions will appear here once you log your first session."/>}</section>
     <section className="panel"><div className="panel-head"><div><h2>Upcoming revisions</h2><p className="muted">Keep important topics fresh</p></div><button className="text-btn" onClick={()=>onNavigate("Revision")}>Open planner</button></div>{next.length?next.map(r=><div className="revision-row" key={r.id}><div className="soft-icon"><RotateCcw/></div><div className="grow"><b>{data.topics.find(t=>t.id===r.topicId)?.name||"Topic"}</b><small>{r.cycle}, {r.date}</small></div><span className="status-pill">Planned</span></div>):<Empty text="No revisions scheduled yet. Add a topic to your revision plan when you're ready."/>}</section></div>
     <div className="resource-banner"><div className="resource-icon"><GraduationCap size={22}/></div><div className="grow"><b>Official ICAI learning resources</b><p>Study material, RTPs, MTPs and suggested answers on the Board of Studies portal.</p></div><a className="outline-link" href="https://boslive.icai.org/" target="_blank" rel="noreferrer">Visit ICAI portal <ChevronRight size={16}/></a></div>
   </>;
@@ -333,7 +422,7 @@ function Learn({data,selected,setSelected,onAddNote,onDeleteNote,onUpdateTopic}:
     <section className="panel learn-main" ref={workspace}><div className="panel-head"><div><h2>{chosen?.name||"Select a topic"}</h2><p className="muted">{chosen?.chapter||"Your learning notes and resources"}</p></div>{chosen&&<select value={chosen.status} onChange={e=>onUpdateTopic(chosen.id,{status:e.target.value as Topic["status"]})}><option>Not started</option><option>Learning</option><option>Completed</option></select>}</div>
       {chosen?<><div className="learning-guidance"><Sparkles size={17}/><div><b>Suggested learning flow</b><p>Read the relevant ICAI material → understand the concepts → work through illustrations → solve exam questions → write down what needs revision.</p></div></div><label className="field-label">Official or personal resource link</label><input className="text-input" placeholder="Paste a link to ICAI material, lecture or reference" value={chosen.resource} onChange={e=>onUpdateTopic(chosen.id,{resource:e.target.value})}/>{chosen.resource&&<a className="inline-link" href={chosen.resource} target="_blank" rel="noreferrer">Open resource <ChevronRight size={14}/></a>}<label className="field-label">Topic notes / key takeaways</label><textarea className="textarea" rows={4} placeholder="Write concepts, examples, doubts or important points..." value={chosen.notes} onChange={e=>onUpdateTopic(chosen.id,{notes:e.target.value})}/><div className="save-row"><span className="tiny muted">Saved automatically in this browser</span><button className="secondary" onClick={()=>{setTitle(chosen.name+" — Notes");setBody(chosen.notes);}}>Copy topic notes to note editor</button></div></>:<Empty text="Select a topic after adding chapters in the Syllabus section."/>}
     </section></div>
-    <section className="panel notes-panel"><div className="panel-head"><div><h2>Personal notes library</h2><p className="muted">Your own summaries, formulas and important points</p></div></div><div className="note-editor"><input className="text-input" placeholder="Note title" value={title} onChange={e=>setTitle(e.target.value)}/><select className="select-input" value={topicId} onChange={e=>setTopicId(e.target.value)}><option value="">No linked topic</option>{topics.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select><textarea className="textarea" rows={3} placeholder="Write your notes..." value={body} onChange={e=>setBody(e.target.value)}/><div className="right"><button className="primary" disabled={!title.trim()||!body.trim()} onClick={()=>{onAddNote({id:uid(),subjectId:selected,topicId,title,body,updated:today()});setTitle("");setBody("");}}>Save note</button></div></div>{notes.map(n=><div className="saved-note" key={n.id}><div className="grow"><b>{n.title}</b><small>{n.updated} {n.topicId?"· "+(data.topics.find(t=>t.id===n.topicId)?.name||"Topic"):""}</small><p>{n.body}</p></div><button className="icon-btn danger-hover" onClick={()=>onDeleteNote(n.id)}><Trash2 size={16}/></button></div>)}</section>
+    <section className="panel"><div className="panel-head"><div><h2>Personal notes library</h2><p className="muted">Your own summaries, formulas and important points</p></div></div><div className="note-editor"><input className="text-input" placeholder="Note title" value={title} onChange={e=>setTitle(e.target.value)}/><select className="select-input" value={topicId} onChange={e=>setTopicId(e.target.value)}><option value="">No linked topic</option>{topics.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select><textarea className="textarea" rows={3} placeholder="Write your notes..." value={body} onChange={e=>setBody(e.target.value)}/><div className="right"><button className="primary" disabled={!title.trim()||!body.trim()} onClick={()=>{onAddNote({id:uid(),subjectId:selected,topicId,title,body,updated:today()});setTitle("");setBody("");}}>Save note</button></div></div>{notes.map(n=><div className="saved-note" key={n.id}><div className="grow"><b>{n.title}</b><small>{n.updated} {n.topicId?"· "+(data.topics.find(t=>t.id===n.topicId)?.name||"Topic"):""}</small><p>{n.body}</p></div><button className="icon-btn danger-hover" onClick={()=>onDeleteNote(n.id)}><Trash2 size={16}/></button></div>)}</section>
   </>;
 }
 
@@ -373,7 +462,7 @@ function Analytics({data}:{data:State}) {
   const all=data.sessions.reduce((n,s)=>n+s.minutes,0);
   const max=Math.max(1,...subjects.map(sub=>data.sessions.filter(s=>s.subjectId===sub.id).reduce((n,s)=>n+s.minutes,0)));
   return <><PageTitle title="Study analytics" desc="Where your time is going and how your preparation is progressing."/><div className="stats-grid analytics-stats"><Stat icon={<Clock3/>} label="All-time study" value={fmtHours(all)} sub={`${data.sessions.length} sessions logged`}/><Stat icon={<CalendarDays/>} label="This week" value={fmtHours(week.reduce((n,s)=>n+s.minutes,0))} sub="Since Monday"/><Stat icon={<Activity/>} label="This month" value={fmtHours(month.reduce((n,s)=>n+s.minutes,0))} sub="Current calendar month"/><Stat icon={<ListChecks/>} label="Topics completed" value={`${data.topics.filter(t=>t.status==="Completed").length}`} sub={`Out of ${data.topics.length} added topics`}/></div>
-    <section className="panel analytics-panel"><div className="panel-head"><div><h2>Subject-wise study time</h2><p className="muted">All recorded sessions</p></div></div>{subjects.map(s=>{const mins=data.sessions.filter(x=>x.subjectId===s.id).reduce((n,x)=>n+x.minutes,0);const Icon=SUBJECT_ICON[s.id]??BookOpen;return <div className="bar-row" key={s.id}><span className="chip soft" style={tint(s.color)}><Icon/></span><div className="grow"><b>{s.name}</b><div className="bar-track"><span style={{width:`${mins/max*100}%`,background:s.color}}/></div></div><strong>{fmtHours(mins)}</strong></div>})}</section>
+    <section className="panel"><div className="panel-head"><div><h2>Subject-wise study time</h2><p className="muted">All recorded sessions</p></div></div>{subjects.map(s=>{const mins=data.sessions.filter(x=>x.subjectId===s.id).reduce((n,x)=>n+x.minutes,0);const Icon=SUBJECT_ICON[s.id]??BookOpen;return <div className="bar-row" key={s.id}><span className="chip soft" style={tint(s.color)}><Icon/></span><div className="grow"><b>{s.name}</b><div className="bar-track"><span style={{width:`${mins/max*100}%`,background:s.color}}/></div></div><strong>{fmtHours(mins)}</strong></div>})}</section>
     <div className="two-col"><section className="panel"><h2>Preparation snapshot</h2><div className="snapshot-line"><span>Topics marked completed</span><b>{data.topics.filter(t=>t.status==="Completed").length}</b></div><div className="snapshot-line"><span>Topics currently learning</span><b>{data.topics.filter(t=>t.status==="Learning").length}</b></div><div className="snapshot-line"><span>Notes saved</span><b>{data.notes.length}</b></div><div className="snapshot-line"><span>Flashcards created</span><b>{data.flashcards.length}</b></div></section><section className="panel"><h2>Practice & revision</h2><div className="snapshot-line"><span>Questions in bank</span><b>{data.questions.length}</b></div><div className="snapshot-line"><span>Revisions scheduled</span><b>{data.revisions.length}</b></div><div className="snapshot-line"><span>Revisions completed</span><b>{data.revisions.filter(r=>r.done).length}</b></div><p className="tiny muted">Analytics are based only on information entered in this app. No target hours are assumed.</p></section></div>
   </>;
 }

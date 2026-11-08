@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import App, { QUOTES, dailyQuote, normalise, syllabusTopics, ymd } from "./App";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import App, { QUOTES, advanceQuote, nextQuote, normalise, syllabusTopics, ymd } from "./App";
 
 const KEY = "ca-final-companion-v1";
+window.scrollTo = () => {}; // jsdom has no layout, so it does not implement scrolling
 // Sidebar navigation (the phone tab bar repeats some of these labels).
 const nav = (label: string) => fireEvent.click(within(document.querySelector(".sidebar") as HTMLElement).getByRole("button", { name: label }));
 const type = (placeholder: string, value: string) => fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value } });
@@ -29,11 +30,28 @@ describe("helpers", () => {
     expect(ymd(new Date(2026, 0, 5, 23, 59))).toBe("2026-01-05");
   });
 
-  it("dailyQuote is stable within a day and changes the next day", () => {
-    expect(dailyQuote(new Date(2026, 10, 9, 0, 1))).toBe(dailyQuote(new Date(2026, 10, 9, 23, 59)));
-    for (let d = 1; d < 60; d++) expect(dailyQuote(new Date(2026, 0, d))).not.toBe(dailyQuote(new Date(2026, 0, d + 1)));
-    const seen = new Set(Array.from({ length: QUOTES.length }, (_, i) => dailyQuote(new Date(2026, 0, 1 + i))));
-    expect(seen.size).toBe(QUOTES.length); // every note is used once per cycle
+  it("has 100 distinct notes", () => {
+    expect(QUOTES).toHaveLength(100);
+    expect(new Set(QUOTES).size).toBe(100);
+    expect(QUOTES.every(q => q.trim().length > 10)).toBe(true);
+  });
+
+  it("notes go in list order, starting at the first, and wrap round after the last", () => {
+    expect(nextQuote(null, "2026-11-08")).toEqual({ i: 0, day: "2026-11-08" });
+    expect(nextQuote({ i: 0, day: "2026-11-08" }, "2026-11-08").i).toBe(1);
+    expect(nextQuote({ i: 99, day: "2026-11-08" }, "2026-11-09").i).toBe(0);
+  });
+
+  it("each load moves to the next note and remembers it; damaged saved state restarts the list", () => {
+    localStorage.removeItem("ca-final-companion-quote");
+    expect([advanceQuote().i, advanceQuote().i, advanceQuote().i]).toEqual([0, 1, 2]);
+    expect(JSON.parse(localStorage.getItem("ca-final-companion-quote")!)).toEqual({ i: 2, day: ymd(new Date()) });
+    for (const bad of ["{oops", '{"i":"x","day":1}', '{"i":-5,"day":"2026-11-08"}', "null"]) {
+      localStorage.setItem("ca-final-companion-quote", bad);
+      expect(advanceQuote().i).toBe(0);
+    }
+    localStorage.removeItem("ca-final-companion-quote");
+    expect(advanceQuote({ i: 41, day: "2026-11-07" }).i).toBe(42); // nothing saved: continue from the one on screen
   });
 
   it("normalise survives garbage input", () => {
@@ -51,13 +69,26 @@ describe("helpers", () => {
 });
 
 describe("startup and storage", () => {
-  it("opens straight on Meghana's dashboard with today's note (no name screen)", () => {
+  it("opens straight on Meghana's dashboard with a love note", () => {
     render(<App />);
     expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghana/ })).toBeTruthy();
-    expect(screen.getByText(dailyQuote(new Date()))).toBeTruthy();
-    expect(screen.getByText("— Jishnu Pedengal")).toBeTruthy();
+    expect(QUOTES).toContain(document.querySelector(".note-text")!.textContent);
+    expect(screen.getByRole("heading", { level: 2, name: "A little love note" })).toBeTruthy();
+    expect(screen.getByText("With love, Jishnu Pedengal")).toBeTruthy();
     expect(screen.getByText("Ready for today's first session?")).toBeTruthy();
-    expect(screen.queryByPlaceholderText("Enter your name")).toBeNull();
+  });
+
+  it("shows the next note when the app comes back on a new day without reloading", () => {
+    render(<App />);
+    const shown = QUOTES.indexOf(document.querySelector(".note-text")!.textContent!);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date(Date.now() + 864e5));
+      act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+      expect(document.querySelector(".note-text")!.textContent).toBe(QUOTES[(shown + 1) % QUOTES.length]);
+      act(() => { document.dispatchEvent(new Event("visibilitychange")); }); // same day again: no change
+      expect(document.querySelector(".note-text")!.textContent).toBe(QUOTES[(shown + 1) % QUOTES.length]);
+    } finally { vi.useRealTimers(); }
   });
 
   it("recovers from corrupt saved data and keeps a copy of it", () => {
