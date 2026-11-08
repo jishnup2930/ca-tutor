@@ -153,6 +153,7 @@ export default function App() {
   // Each page gets a browser history entry, so the phone/browser back button moves between pages.
   const go = (name: string) => {
     setMobileNav(false);
+    window.scrollTo(0, 0); // every page opens at the top; tapping the current tab jumps back up
     if (name === page) return;
     history.pushState({ app: true }, "", `#${encodeURIComponent(name)}`);
     setPage(name);
