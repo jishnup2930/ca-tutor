@@ -69,9 +69,9 @@ describe("helpers", () => {
 });
 
 describe("startup and storage", () => {
-  it("opens straight on Meghana's dashboard with a love note", () => {
+  it("opens straight on Meghna's dashboard with a love note", () => {
     render(<App />);
-    expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghana/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghna/ })).toBeTruthy();
     expect(QUOTES).toContain(document.querySelector(".note-text")!.textContent);
     expect(screen.getByRole("heading", { level: 2, name: "A little love note" })).toBeTruthy();
     expect(screen.getByText("With love, Jishnu Pedengal")).toBeTruthy();
@@ -94,7 +94,7 @@ describe("startup and storage", () => {
   it("recovers from corrupt saved data and keeps a copy of it", () => {
     localStorage.setItem(KEY, "{not json");
     render(<App />);
-    expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghana/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghna/ })).toBeTruthy();
     expect(localStorage.getItem(`${KEY}-unreadable`)).toBe("{not json");
   });
 
@@ -102,7 +102,7 @@ describe("startup and storage", () => {
     const raw = JSON.stringify({ topics: [], sessions: [{ id: "bad", subjectId: "fr", minutes: 10 }] }); // no date
     localStorage.setItem(KEY, raw);
     render(<App />);
-    expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghana/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghna/ })).toBeTruthy();
     expect(localStorage.getItem(`${KEY}-unreadable`)).toBe(raw);
   });
 
@@ -141,7 +141,7 @@ describe("every page renders", () => {
   it.each([
     ["Syllabus", "Syllabus"], ["Learn & Notes", "Learning workspace"], ["Practice", "Practice & test"],
     ["Flashcards", "Flashcards"], ["Revision", "Revision planner"], ["Study Log", "Study log"],
-    ["Analytics", "Study analytics"], ["Settings", "Settings"], ["Dashboard", "Hi, Meghana"]
+    ["Analytics", "Study analytics"], ["Settings", "Settings"], ["Dashboard", "Hi, Meghna"]
   ])("%s", (label, heading) => {
     render(<App />);
     nav(label);
@@ -193,7 +193,7 @@ describe("navigation and back button", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(await h1("Syllabus")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(await h1(/Hi, Meghana/)).toBeTruthy();
+    expect(await h1(/Hi, Meghna/)).toBeTruthy();
   });
 
   it("browser/phone back button moves between pages", async () => {
@@ -201,7 +201,7 @@ describe("navigation and back button", () => {
     nav("Flashcards");
     expect(location.hash).toBe("#Flashcards");
     history.back();
-    expect(await h1(/Hi, Meghana/)).toBeTruthy();
+    expect(await h1(/Hi, Meghna/)).toBeTruthy();
   });
 
   it("opening a page link directly works, and Back then goes to the dashboard", async () => {
@@ -209,13 +209,13 @@ describe("navigation and back button", () => {
     render(<App />);
     expect(screen.getByRole("heading", { level: 1, name: "Study log" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(await h1(/Hi, Meghana/)).toBeTruthy();
+    expect(await h1(/Hi, Meghna/)).toBeTruthy();
   });
 
   it.each(["#%E0", "#Nonsense"])("a bad link (%s) opens the dashboard", hash => {
     history.replaceState(null, "", `/${hash}`);
     render(<App />);
-    expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghana/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: /Hi, Meghna/ })).toBeTruthy();
   });
 });
 

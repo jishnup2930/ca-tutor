@@ -29,7 +29,7 @@ const subjects: Subject[] = [
 const SUBJECT_ICON: Record<string, typeof BookOpen> = { fr: BookOpen, afm: TrendingUp, audit: ShieldCheck, dt: Landmark, idt: Receipt, ibs: Briefcase };
 const tint = (c: string) => ({ "--c": c }) as React.CSSProperties;
 
-const NAME = "Meghana";
+const NAME = "Meghna";
 
 // Jishnu Pedengal's notes, shown in list order: the next one on every page load or refresh, and on each new day. Add or edit freely.
 export const QUOTES = [
@@ -43,7 +43,7 @@ export const QUOTES = [
   "Small steps every day add up to something amazing. I can't wait to celebrate with you.",
   "You're stronger, smarter and braver than this exam. Never forget that.",
   "Whatever today looks like, I'm proud of you for showing up.",
-  "Doubts are normal. Giving up isn't you. Keep going, Meghana.",
+  "Doubts are normal. Giving up isn't you. Keep going, Chinnu.",
   "One more page, one more question, one more step. I'm cheering loudly for you!",
   "Be kind to yourself today. You're working so hard and it shows.",
   "Some days are tough. Remember why you started, and that I'm always with you.",
@@ -64,20 +64,20 @@ export const QUOTES = [
   "I believe in you more than you know. Keep going, superstar.",
   "Consistency beats intensity. Just keep showing up, and you will make it.",
   "The finish line is coming closer every day. I'll be there with you. ❤️",
-  "Every chapter you finish is a step closer to the CA you're becoming. I'm so proud of you.",
+  "Every chapter you finish is a step closer to the CA you're becoming. I'm so proud of you, Chinnu.",
   "Open the book for just ten minutes. I promise the rest gets easier once you start.",
   "You don't have to feel ready. You just have to begin, and I'll be cheering the whole way.",
   "One more illustration solved today is one more mark waiting for you in the exam.",
-  "The hard chapters are where the marks hide. Go find them, superstar. ❤️",
+  "The hard chapters are where the marks hide. Go find them, Chinnu. ❤️",
   "Study a little today, so the exam hall feels like revision. You'll walk in so ready.",
   "Don't count the hours. Make the hours count. I believe in every one of them.",
   "Every tough question today makes exam day a little easier. I'm proud of you for not giving up.",
   "Ind AS looks scary until the second read. Go for round two. You've got this.",
   "Got an MCQ wrong? Perfect. Now you'll never forget the right answer.",
-  "Somewhere ahead is Meghana, CA. Every hour today brings you closer to her. ❤️",
+  "Somewhere ahead is Meghna, CA. Every hour today brings you closer to her. ❤️",
   "Even a short session counts. Log today's, however small, and let me be proud of it.",
   "Understand it, don't just memorise it. The marks follow understanding.",
-  "Today's discipline is exam day's confidence. Keep going, Meghana.",
+  "Today's discipline is exam day's confidence. Keep going, Chinnu.",
   "Tired? Rest for a bit, then come back and finish just one more topic.",
   "You've cleared hard exams before. This is simply the next one on your list.",
   "Phone face down, timer on, one chapter. Let's do this together.",
@@ -86,7 +86,7 @@ export const QUOTES = [
   "You're so good at showing up, even on the hard days. That's what will carry you. ❤️",
   "Start with the topic you've been avoiding. Everything after it feels lighter.",
   "Each revision cycle makes the next one faster. Keep those cycles turning.",
-  "You're not behind. You're on your own path, and you're moving forward.",
+  "You're not behind, Chinnu. You're on your own path, and you're moving forward.",
   "Start small, start now. I'll be cheering from the sidelines. ❤️",
   "Write down every doubt today. Tomorrow's answers start with today's questions.",
   "The syllabus is big, but it's finite. Tick off one more chapter today.",
@@ -98,14 +98,14 @@ export const QUOTES = [
   "Past papers are never wasted time. Try one today, and be proud of it whatever the score.",
   "Set one goal for today and finish it. That's a really good day.",
   "When a concept finally clicks, write it in your own words before it slips away.",
-  "You've done harder things than this chapter. You'll get through this one too. ❤️",
+  "You've done harder things than this chapter, Chinnu. You'll get through this one too. ❤️",
   "Every focused hour is an investment that pays back in the exam hall.",
   "Be proud of the work you've already done. Then add a little more today.",
   "Focus on your own page today. That's the only one that matters, and you're writing it beautifully.",
   "Tax law rewards precision. Slow down today; being careful is your superpower.",
   "Break the chapter into small pieces. Finish the first piece right now.",
   "A short revision today saves a long one later. Future you says thank you.",
-  "Every bit of preparation builds your confidence. I can already see how much you've grown.",
+  "Every bit of preparation builds your confidence. I can already see how much you've grown, Chinnu.",
   "Today, understand one thing better than you did yesterday. That's enough.",
   "Ten minutes on yesterday's topic before a new one. You'll be amazed how much you remember.",
   "AFM numbers get friendly once you've solved enough of them. Solve a few more.",
@@ -116,7 +116,7 @@ export const QUOTES = [
   "Read the question twice, answer once. I've seen how sharp you are when you slow down.",
   "Make your notes so clear that revision feels easy. Future you will be so grateful.",
   "Take the break, but set an alarm for when it ends. I'll be cheering when you're back at it.",
-  "Sleep is part of the study plan. Rest well tonight, you've earned it. ❤️",
+  "Sleep is part of the study plan. Rest well tonight, Chinnu. You've earned it. ❤️",
   "Slow days still count. Progress is progress.",
   "You're closer today than you were yesterday. Always remember that.",
   "Explain today's concept as if you're teaching me. If I get it, you've definitely got it.",
@@ -125,14 +125,14 @@ export const QUOTES = [
   "The dream you started with is still worth every hour you give it.",
   "Try one case study today. Each one sharpens the way you think.",
   "Be patient with yourself. Mastery takes repetition, not perfection.",
-  "One bad day doesn't undo many good ones. Begin again today. ❤️",
+  "One bad day doesn't undo many good ones, Chinnu. Begin again today. ❤️",
   "Revise with questions, not just rereading. It sticks better, and you'll feel the difference.",
   "Give your hardest topics the best hours of your day. You're more than a match for them.",
   "Done is better than perfect. Finish the chapter, polish it in revision.",
   "Every topic you master is yours for life, not just for the exam.",
   "When it feels hard, it means you're learning. One more page.",
   "Keep showing up for yourself. That's the whole secret.",
-  "I'm proud of every single hour you put in. Let's add one more today. ❤️"
+  "I'm proud of every single hour you put in, Chinnu. Let's add one more today. ❤️"
 ];
 
 const PAGES = ["Dashboard", "Syllabus", "Learn & Notes", "Practice", "Flashcards", "Revision", "Study Log", "Analytics", "Settings"];
