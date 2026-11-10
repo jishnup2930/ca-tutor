@@ -4,13 +4,14 @@ import {
   CalendarDays, Check, ChevronRight, CircleHelp, Clock3,
   FileText, GraduationCap, Home, Layers, ListChecks, Menu, Plus, Search,
   Settings, Sparkles, Trash2, X, ClipboardList, RotateCcw, ArrowLeft,
-  Star, TrendingUp, ShieldCheck, Landmark, Receipt, Briefcase, Download, Share, SquarePlus
+  Star, TrendingUp, ShieldCheck, Landmark, Receipt, Briefcase, Download, Share, SquarePlus,
+  Timer as TimerIcon, Play, Pause, Square, ArrowLeftRight
 } from "lucide-react";
 import { SYLLABUS } from "./syllabus";
 
 type Subject = { id: string; name: string; code: string; group: string; color: string; };
 type Topic = { id: string; subjectId: string; chapter: string; name: string; status: "Not started" | "Learning" | "Completed"; difficulty: "Easy" | "Medium" | "Difficult"; notes: string; resource: string; };
-type Session = { id: string; date: string; subjectId: string; topicId: string; topicName: string; minutes: number; note: string; };
+type Session = { id: string; date: string; subjectId: string; topicId: string; topicName: string; minutes: number; note: string; topicIds?: string[] };
 type Note = { id: string; subjectId: string; topicId: string; title: string; body: string; updated: string; };
 type Question = { id: string; subjectId: string; topicId: string; prompt: string; options: string[]; answer: number; explanation: string; };
 type Flashcard = { id: string; subjectId: string; front: string; back: string; };
@@ -191,6 +192,31 @@ const keepAside = (raw: string | null) => { try { if (raw) localStorage.setItem(
 // Every ICAI chapter as a topic. New installs start with these; "Load ICAI chapters" adds any missing ones.
 export const syllabusTopics = (): Topic[] => Object.entries(SYLLABUS).flatMap(([subjectId, groups]) => groups.flatMap(([chapter, names]) =>
   names.map(name => ({ id: uid(), subjectId, chapter, name, status: "Not started" as const, difficulty: "Medium" as const, notes: "", resource: "" }))));
+// ---------- Study timer ----------
+// elapsedMs = time banked before the current run; runStart = when the current run began (null while paused).
+export type StudyTimer = { subjectId: string; topicIds: string[]; startedAt: number; elapsedMs: number; runStart: number | null };
+const TIMER_KEY = "ca-final-companion-timer";
+export const LONG_TIMER_MS = 5 * 60 * 60 * 1000; // "Still studying?" after 5 hours
+export const timerMs = (t: StudyTimer, now: number) => t.elapsedMs + (t.runStart === null ? 0 : Math.max(0, now - t.runStart));
+export const startTimer = (subjectId: string, topicIds: string[], now: number): StudyTimer => ({ subjectId, topicIds, startedAt: now, elapsedMs: 0, runStart: now });
+export const pauseTimer = (t: StudyTimer, now: number): StudyTimer => ({ ...t, elapsedMs: timerMs(t, now), runStart: null });
+export const resumeTimer = (t: StudyTimer, now: number): StudyTimer => (t.runStart === null ? { ...t, runStart: now } : t);
+export const fmtClock = (ms: number) => { const sec = Math.floor(ms / 1000); return `${Math.floor(sec / 3600)}:${String(Math.floor(sec / 60) % 60).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`; };
+const readTimer = (): StudyTimer | null => {
+  try {
+    const t = JSON.parse(localStorage.getItem(TIMER_KEY) || "null");
+    const ok = t && typeof t.subjectId === "string" && Array.isArray(t.topicIds) && t.topicIds.every((x: unknown) => typeof x === "string")
+      && Number.isFinite(t.startedAt) && Number.isFinite(t.elapsedMs) && t.elapsedMs >= 0 && (t.runStart === null || Number.isFinite(t.runStart));
+    return ok ? t : null;
+  } catch { return null; }
+};
+const writeTimer = (t: StudyTimer | null) => { try { if (t) localStorage.setItem(TIMER_KEY, JSON.stringify(t)); else localStorage.removeItem(TIMER_KEY); } catch { /* storage blocked */ } };
+// A finished timer as a log entry, dated the day it was started.
+export const timerSession = (t: StudyTimer, ms: number, topics: Topic[]): Omit<Session, "id"> => ({
+  date: ymd(new Date(t.startedAt)), subjectId: t.subjectId, topicIds: t.topicIds, topicId: t.topicIds[0] ?? "",
+  topicName: t.topicIds.map(id => topics.find(x => x.id === id)?.name).filter(Boolean).join(", "), minutes: Math.round(ms / 60000), note: ""
+});
+
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const today = () => ymd(new Date());
 const readState = (): State => {
@@ -231,6 +257,15 @@ export default function App() {
     try { await installPrompt.prompt(); } catch { /* prompt already used or dismissed */ }
     setInstallPrompt(null); // a prompt can only be shown once; Chrome fires a new event if it can be offered again
   };
+  const [timer, setTimerState] = useState<StudyTimer | null>(readTimer);
+  const setTimer = (t: StudyTimer | null) => { writeTimer(t); setTimerState(t); };
+  const [endAt, setEndAt] = useState(0); // when End was tapped; the save sheet uses this moment
+  const [, setTick] = useState(0);
+  useEffect(() => { // redraw every second while running; the time itself comes from the clock
+    if (!timer || timer.runStart === null) return;
+    const id = window.setInterval(() => setTick(n => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [timer]);
   const [quote, setQuote] = useState(() => (loadQuote ??= advanceQuote()));
   // A phone may resume the app the next morning without reloading; give it the next note on a new day.
   useEffect(() => {
@@ -286,9 +321,28 @@ export default function App() {
     notify(add.length ? `Added ${add.length} ICAI chapters` : "All ICAI chapters are already in your syllabus");
   };
   const updateTopic = (id: string, patch: Partial<Topic>) => update({ topics: data.topics.map(t => t.id === id ? { ...t, ...patch } : t) });
-  const addSession = (payload: Omit<Session, "id">) => {
-    update({ sessions: [...data.sessions, { ...payload, id: uid() }] });
-    setModal(""); notify("Study time saved");
+  // Saving a session also marks its chapters "Learning" if they were "Not started" (never downgrades "Completed").
+  const saveSession = (payload: Omit<Session, "id">) => {
+    const ids = new Set(payload.topicIds ?? []);
+    setData(prev => ({ ...prev, sessions: [...prev.sessions, { ...payload, id: uid() }],
+      topics: prev.topics.map(t => ids.has(t.id) && t.status === "Not started" ? { ...t, status: "Learning" } : t) }));
+  };
+  const addSession = (payload: Omit<Session, "id">) => { saveSession(payload); setModal(""); notify("Study time saved"); };
+  const paperCode = (id: string) => subjects.find(s => s.id === id)?.code.split(" · ")[1] ?? "";
+  const beginTimer = (subjectId: string, topicIds: string[]) => {
+    const now = Date.now();
+    if (timer) { // Switch: save the part studied so far as its own entry, then start timing the new paper
+      const ms = timerMs(timer, now);
+      if (ms >= 60000) saveSession(timerSession(timer, ms, data.topics));
+      notify(ms >= 60000 ? `Saved ${fmtHours(Math.round(ms / 60000))} on ${paperCode(timer.subjectId)}. Now timing ${paperCode(subjectId)}` : `Now timing ${paperCode(subjectId)}`);
+    } else notify("Timer started");
+    setTimer(startTimer(subjectId, topicIds, now)); setModal("");
+  };
+  const endTimer = () => {
+    if (!timer) return;
+    const now = Date.now();
+    if (timerMs(timer, now) < 60000) { setTimer(null); notify("Timer stopped. Under a minute, so nothing was saved."); return; }
+    setEndAt(now); setModal("timer-end");
   };
   const exportData = () => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -317,7 +371,7 @@ export default function App() {
     { label: "Personalise", icon: Settings, items: ["Settings"] }
   ];
 
-  return <div className="app-shell">
+  return <div className={`app-shell ${timer ? "timing" : ""}`}>
     <aside className={`sidebar ${mobileNav ? "show" : ""}`}>
       <div className="profile-mini"><div className="avatar"><img src="./avatar.jpg" alt=""/></div><div><b>{NAME}</b><small>May 2027 attempt</small></div><button className="icon-btn close-nav" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
       <nav>{nav.map(group => <div className="nav-group" key={group.label}><div className="nav-heading"><group.icon size={14}/>{group.label}</div>{group.items.map(item => <button key={item} className={`nav-item ${page === item ? "active" : ""}`} onClick={() => go(item)}>{item === "Dashboard" ? <Home/> : item === "Syllabus" ? <Layers/> : item === "Learn & Notes" ? <FileText/> : item === "Practice" ? <ClipboardList/> : item === "Flashcards" ? <Brain/> : item === "Revision" ? <RotateCcw/> : item === "Study Log" ? <Clock3/> : item === "Analytics" ? <Activity/> : <Settings/>}{item}</button>)}</div>)}</nav>
@@ -326,14 +380,15 @@ export default function App() {
     {mobileNav && <div className="scrim" onClick={() => setMobileNav(false)}/>}
     <main className="main">
       <header className="topbar">{page !== "Dashboard" && <button className="icon-btn" aria-label="Back" title="Back" onClick={back}><ArrowLeft size={18}/></button>}<div className="top-actions"><span className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div></header>
+      {timer && <TimerBar timer={timer} data={data} onPause={() => setTimer(pauseTimer(timer, Date.now()))} onResume={() => setTimer(resumeTimer(timer, Date.now()))} onSwitch={() => setModal("timer-switch")} onEnd={endTimer}/>}
       <div className="content">
-        {page === "Dashboard" && <Dashboard data={data} quote={QUOTES[quote.i]} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
+        {page === "Dashboard" && <Dashboard data={data} timing={!!timer} onTimer={() => setModal("timer-start")} quote={QUOTES[quote.i]} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
         {page === "Syllabus" && <Syllabus data={data} selected={selectedSubject} setSelected={setSelectedSubject} search={search} setSearch={setSearch} onAdd={() => setModal("topic")} onLoad={loadSyllabus} onUpdate={updateTopic} onDelete={id => update({topics:data.topics.filter(t=>t.id!==id)})}/>}
         {page === "Learn & Notes" && <Learn data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAddNote={note => {update({notes:[...data.notes,note]});notify("Note saved");}} onDeleteNote={id => update({notes:data.notes.filter(n=>n.id!==id)})} onUpdateTopic={updateTopic}/>}
         {page === "Practice" && <Practice data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAdd={q => {update({questions:[...data.questions,q]});notify("Question added");}}/>}
         {page === "Flashcards" && <Flashcards data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAdd={f => {update({flashcards:[...data.flashcards,f]});notify("Flashcard added");}} onDelete={id=>update({flashcards:data.flashcards.filter(f=>f.id!==id)})}/>}
         {page === "Revision" && <RevisionPage data={data} onAdd={r=>{update({revisions:[...data.revisions,r]});notify("Revision scheduled");}} onToggle={id=>update({revisions:data.revisions.map(r=>r.id===id?{...r,done:!r.done}:r)})}/>}
-        {page === "Study Log" && <StudyLog data={data} onAdd={() => setModal("session")} onDelete={id=>update({sessions:data.sessions.filter(s=>s.id!==id)})}/>}
+        {page === "Study Log" && <StudyLog data={data} timing={!!timer} onTimer={() => setModal("timer-start")} onAdd={() => setModal("session")} onDelete={id=>update({sessions:data.sessions.filter(s=>s.id!==id)})}/>}
         {page === "Analytics" && <Analytics data={data}/>}
         {page === "Settings" && <SettingsPage canInstall={canInstall} installed={installed} onInstall={install} onExport={exportData} onImport={()=>fileRef.current?.click()} onReset={()=>{if(confirm("Reset all app data in this browser? Export a backup first if you need it.")){setData(emptyState);notify("App data reset");}}}/>}
       </div>
@@ -349,6 +404,12 @@ export default function App() {
     {modal === "topic" && <TopicModal onClose={()=>setModal("")} onSave={addTopic}/>}
     {modal === "session" && <SessionModal data={data} onClose={()=>setModal("")} onSave={addSession}/>}
     {modal === "install-ios" && <InstallIosModal onClose={()=>setModal("")}/>}
+    {modal === "timer-start" && <TimerStartModal data={data} title="Start study timer" startLabel="Start timer" onClose={()=>setModal("")} onStart={beginTimer}/>}
+    {modal === "timer-switch" && timer && <TimerStartModal data={data} title="Switch to another paper" startLabel="Switch" note="The time so far is saved as its own entry, then the timer carries on for the new paper." onClose={()=>setModal("")} onStart={beginTimer}/>}
+    {modal === "timer-end" && timer && <SessionModal data={data} title="Save this study session" initial={timerSession(timer, timerMs(timer, endAt), data.topics)}
+      warning={timerMs(timer, endAt) > LONG_TIMER_MS ? `Still studying? The timer ran ${fmtHours(Math.round(timerMs(timer, endAt) / 60000))} since ${new Date(timer.startedAt).toLocaleString("en-IN", { weekday: "short", hour: "numeric", minute: "2-digit" })}. If you forgot to stop it, change the time below.` : undefined}
+      onDiscard={() => { setTimer(null); setModal(""); notify("Timer discarded"); }}
+      onClose={()=>setModal("")} onSave={payload => { saveSession(payload); setTimer(null); setModal(""); notify("Study time saved"); }}/>}
     {toast && <div className="toast"><Check size={16}/>{toast}</div>}
   </div>;
 }
@@ -375,7 +436,7 @@ const QUICK = [
   { page: "Revision", label: "Revision", Icon: RotateCcw, color: "var(--orange)" },
   { page: "Learn & Notes", label: "Learn & Notes", Icon: FileText, color: "var(--blue)" }
 ];
-function Dashboard({data,quote,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data:State;quote:string;totalMinutes:number;progress:number;onNavigate:(s:string)=>void;onAdd:()=>void;onSubject:(id:string)=>void}) {
+function Dashboard({data,timing,onTimer,quote,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data:State;timing:boolean;onTimer:()=>void;quote:string;totalMinutes:number;progress:number;onNavigate:(s:string)=>void;onAdd:()=>void;onSubject:(id:string)=>void}) {
   const next = data.revisions.filter(r=>!r.done).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
   const lastTopic = [...data.sessions].sort((a,b)=>b.date.localeCompare(a.date))[0];
   const done = data.topics.filter(t=>t.status==="Completed").length;
@@ -384,7 +445,7 @@ function Dashboard({data,quote,totalMinutes,progress,onNavigate,onAdd,onSubject}
   return <>
     <section className="hello"><div><h1>Hi, <b>{NAME}</b></h1><p>{todayMins ? `You've studied ${fmtHours(todayMins).replace(/^0h /, "").replace(/ 0m$/, "")} today.` : "Ready for today's first session?"}</p></div><img className="hello-figure" src="./meghana-figure.webp" alt="" width={210} height={560}/></section>
     <div className="dash-top">
-      <section className="personal-note"><div className="note-body"><h2>A little love note</h2><p className="note-text">{quote}</p><p className="note-sign">With love, Jishnu Pedengal</p><button className="primary" onClick={onAdd}><Plus size={18}/> Log study time</button></div><HeartArt/></section>
+      <section className="personal-note"><div className="note-body"><h2>A little love note</h2><p className="note-text">{quote}</p><p className="note-sign">With love, Jishnu Pedengal</p><div className="note-actions"><button className="primary" onClick={onTimer} disabled={timing}><TimerIcon size={18}/> {timing ? "Timer running" : "Start timer"}</button><button className="secondary" onClick={onAdd}><Plus size={18}/> Log study time</button></div></div><HeartArt/></section>
       <button className="progress-card" onClick={()=>onNavigate("Syllabus")}>
         <div className="pc-head"><div><span className="pc-icon"><Layers size={18}/></span><b>Syllabus progress</b><small>{done} of {data.topics.length} chapters done</small></div><div className="pc-big">{progress}<span>%</span></div></div>
         <div className="slider"><span style={{width:`${progress}%`}}/></div>
@@ -470,11 +531,11 @@ function RevisionPage({data,onAdd,onToggle}:{data:State;onAdd:(r:Revision)=>void
     <section className="panel"><div className="panel-head"><div><h2>Your revision list</h2><p className="muted">{ordered.filter(r=>r.done).length} of {ordered.length} completed</p></div></div>{ordered.length?ordered.map(r=><div className="topic-row" key={r.id}><button className={`topic-check ${r.done?"done":""}`} onClick={()=>onToggle(r.id)}>{r.done&&<Check size={13}/>}</button><div className="grow"><b>{data.topics.find(t=>t.id===r.topicId)?.name||"Deleted topic"}</b><small>{r.cycle} · {r.date}</small></div><span className={`status-pill ${r.done?"complete":""}`}>{r.done?"Completed":"Planned"}</span></div>):<Empty text="Your revision plan is empty. Schedule the topics you want to revisit."/>}</section>
   </>;
 }
-function StudyLog({data,onAdd,onDelete}:{data:State;onAdd:()=>void;onDelete:(id:string)=>void}) {
+function StudyLog({data,timing,onTimer,onAdd,onDelete}:{data:State;timing:boolean;onTimer:()=>void;onAdd:()=>void;onDelete:(id:string)=>void}) {
   const [month,setMonth]=useState(today().slice(0,7));
   const list=data.sessions.filter(s=>s.date.startsWith(month)).sort((a,b)=>b.date.localeCompare(a.date));
   const sum=list.reduce((n,s)=>n+s.minutes,0);
-  return <><PageTitle title="Study log" desc="Log the actual time you studied. There is no compulsory daily target." action={<button className="primary" onClick={onAdd}><Plus size={16}/> Add session</button>}/><div className="log-summary"><div><span className="muted">Selected month total</span><strong>{fmtHours(sum)}</strong></div><div><span className="muted">Sessions</span><strong>{list.length}</strong></div><div><span className="muted">Study days</span><strong>{new Set(list.map(s=>s.date)).size}</strong></div><input className="text-input month-input" type="month" value={month} onChange={e=>setMonth(e.target.value)}/></div><section className="panel">{list.length?list.map(s=><div className="session-row" key={s.id}><div className="date-box"><b>{new Date(s.date+"T00:00:00").getDate()}</b><small>{new Date(s.date+"T00:00:00").toLocaleDateString("en-IN",{month:"short"})}</small></div><div className="grow"><b>{s.topicName||"Study session"}</b><small>{subjects.find(x=>x.id===s.subjectId)?.name} {s.note?"· "+s.note:""}</small></div><strong>{fmtHours(s.minutes)}</strong><button className="icon-btn danger-hover" onClick={()=>onDelete(s.id)}><Trash2 size={16}/></button></div>):<Empty text="No study sessions recorded for this month. Add a session whenever you finish studying."/>}</section></>;
+  return <><PageTitle title="Study log" desc="Log the actual time you studied. There is no compulsory daily target." action={<div className="title-actions"><button className="primary" onClick={onTimer} disabled={timing}><TimerIcon size={16}/> {timing ? "Timer running" : "Start timer"}</button><button className="secondary" onClick={onAdd}><Plus size={16}/> Add session</button></div>}/><div className="log-summary"><div><span className="muted">Selected month total</span><strong>{fmtHours(sum)}</strong></div><div><span className="muted">Sessions</span><strong>{list.length}</strong></div><div><span className="muted">Study days</span><strong>{new Set(list.map(s=>s.date)).size}</strong></div><input className="text-input month-input" type="month" value={month} onChange={e=>setMonth(e.target.value)}/></div><section className="panel">{list.length?list.map(s=><div className="session-row" key={s.id}><div className="date-box"><b>{new Date(s.date+"T00:00:00").getDate()}</b><small>{new Date(s.date+"T00:00:00").toLocaleDateString("en-IN",{month:"short"})}</small></div><div className="grow"><b>{s.topicName||"Study session"}</b><small>{subjects.find(x=>x.id===s.subjectId)?.name} {s.note?"· "+s.note:""}</small></div><strong>{fmtHours(s.minutes)}</strong><button className="icon-btn danger-hover" onClick={()=>onDelete(s.id)}><Trash2 size={16}/></button></div>):<Empty text="No study sessions recorded for this month. Add a session whenever you finish studying."/>}</section></>;
 }
 function Analytics({data}:{data:State}) {
   const now=new Date(); const startWeek=new Date(now);startWeek.setDate(now.getDate()-((now.getDay()+6)%7));const weekKey=ymd(startWeek);
@@ -498,10 +559,34 @@ function TopicModal({onClose,onSave}:{onClose:()=>void;onSave:(chapter:string,na
   const [chapter,setChapter]=useState("");const [name,setName]=useState("");
   return <Modal title="Add syllabus topic" onClose={onClose}><label className="field-label">Chapter / unit</label><input className="text-input" autoFocus value={chapter} onChange={e=>setChapter(e.target.value)} placeholder="e.g. Chapter 1"/><label className="field-label">Topic name</label><input className="text-input" value={name} onChange={e=>setName(e.target.value)} placeholder="Enter topic name" onKeyDown={e=>e.key==="Enter"&&onSave(chapter,name)}/><div className="modal-actions"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" disabled={!name.trim()} onClick={()=>onSave(chapter,name)}>Add topic</button></div></Modal>;
 }
-function SessionModal({data,onClose,onSave}:{data:State;onClose:()=>void;onSave:(s:Omit<Session,"id">)=>void}) {
-  const [date,setDate]=useState(today());const [subjectId,setSubjectId]=useState("fr");const [topicId,setTopicId]=useState("");const [hours,setHours]=useState("1");const [minutes,setMinutes]=useState("0");const [note,setNote]=useState("");
+function ChapterPicker({topics,value,onChange}:{topics:Topic[];value:string[];onChange:(ids:string[])=>void}) {
+  if (!topics.length) return <p className="muted">No chapters for this paper yet. Add them in Syllabus.</p>;
+  return <div className="chapter-picker">{topics.map(t=><label key={t.id} className={value.includes(t.id)?"on":""}><input type="checkbox" checked={value.includes(t.id)} onChange={()=>onChange(value.includes(t.id)?value.filter(x=>x!==t.id):[...value,t.id])}/><span>{t.name}</span></label>)}</div>;
+}
+function TimerStartModal({data,title,startLabel,note,onClose,onStart}:{data:State;title:string;startLabel:string;note?:string;onClose:()=>void;onStart:(subjectId:string,topicIds:string[])=>void}) {
+  const [subjectId,setSubjectId]=useState("fr");const [topicIds,setTopicIds]=useState<string[]>([]);
+  return <Modal title={title} onClose={onClose}><p className="muted modal-desc">{note ?? "Pick what you're about to study. Pause for breaks; when you tap End, the time goes into your study log."}</p><label className="field-label">Paper</label><select className="select-input" value={subjectId} onChange={e=>{setSubjectId(e.target.value);setTopicIds([]);}}>{subjects.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select><label className="field-label">Chapters (optional, pick one or more)</label><ChapterPicker topics={data.topics.filter(t=>t.subjectId===subjectId)} value={topicIds} onChange={setTopicIds}/><div className="modal-actions"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" onClick={()=>onStart(subjectId,topicIds)}><Play size={16}/> {startLabel}</button></div></Modal>;
+}
+function SessionModal({data,title="Log a study session",initial,warning,onDiscard,onClose,onSave}:{data:State;title?:string;initial?:Omit<Session,"id">;warning?:string;onDiscard?:()=>void;onClose:()=>void;onSave:(s:Omit<Session,"id">)=>void}) {
+  const [date,setDate]=useState(initial?.date??today());const [subjectId,setSubjectId]=useState(initial?.subjectId??"fr");const [topicIds,setTopicIds]=useState<string[]>(initial?.topicIds??[]);
+  const [hours,setHours]=useState(initial?String(Math.floor(initial.minutes/60)):"1");const [minutes,setMinutes]=useState(initial?String(initial.minutes%60):"0");const [note,setNote]=useState(initial?.note??"");
   const topicOptions=data.topics.filter(t=>t.subjectId===subjectId);
-  return <Modal title="Log a study session" onClose={onClose}><p className="muted modal-desc">Enter the time you actually studied. You can log more than one session per day.</p><label className="field-label">Date</label><input className="text-input" type="date" value={date} onChange={e=>setDate(e.target.value)}/><label className="field-label">Subject</label><select className="select-input" value={subjectId} onChange={e=>{setSubjectId(e.target.value);setTopicId("");}}>{subjects.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select><label className="field-label">Topic (optional)</label><select className="select-input" value={topicId} onChange={e=>setTopicId(e.target.value)}><option value="">General study</option>{topicOptions.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><label className="field-label">Actual study time</label><div className="duration-inputs"><div><input className="text-input" type="number" min="0" max="24" value={hours} onChange={e=>setHours(e.target.value)}/><small>Hours</small></div><div><input className="text-input" type="number" min="0" max="59" value={minutes} onChange={e=>setMinutes(e.target.value)}/><small>Minutes</small></div></div><label className="field-label">What did you cover? (optional)</label><input className="text-input" value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Read concepts and solved illustrations"/><div className="modal-actions"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" disabled={(Number(hours)||0)*60+(Number(minutes)||0)<=0||Number(hours)<0||Number(minutes)<0||Number(minutes)>59} onClick={()=>onSave({date,subjectId,topicId,topicName:topicOptions.find(t=>t.id===topicId)?.name||"",minutes:(Number(hours)||0)*60+(Number(minutes)||0),note})}>Save session</button></div></Modal>;
+  const total=(Number(hours)||0)*60+(Number(minutes)||0);
+  const picked=topicIds.filter(id=>topicOptions.some(t=>t.id===id));
+  return <Modal title={title} onClose={onClose}>{warning?<p className="timer-warning" role="alert">{warning}</p>:<p className="muted modal-desc">{initial?"Check the details, then save it to your study log.":"Enter the time you actually studied. You can log more than one session per day."}</p>}<label className="field-label">Date</label><input className="text-input" type="date" value={date} onChange={e=>setDate(e.target.value)}/><label className="field-label">Subject</label><select className="select-input" value={subjectId} onChange={e=>{setSubjectId(e.target.value);setTopicIds([]);}}>{subjects.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select><label className="field-label">Chapters (optional, pick one or more)</label><ChapterPicker topics={topicOptions} value={picked} onChange={setTopicIds}/><label className="field-label">Actual study time</label><div className="duration-inputs"><div><input className="text-input" type="number" min="0" max="24" value={hours} onChange={e=>setHours(e.target.value)}/><small>Hours</small></div><div><input className="text-input" type="number" min="0" max="59" value={minutes} onChange={e=>setMinutes(e.target.value)}/><small>Minutes</small></div></div><label className="field-label">What did you cover? (optional)</label><input className="text-input" value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Read concepts and solved illustrations"/><div className="modal-actions">{onDiscard&&<button className="text-btn discard-btn" onClick={onDiscard}>Discard</button>}<button className="secondary" onClick={onClose}>{initial?"Keep timing":"Cancel"}</button><button className="primary" disabled={total<=0||Number(hours)<0||Number(minutes)<0||Number(minutes)>59} onClick={()=>onSave({date,subjectId,topicIds:picked,topicId:picked[0]??"",topicName:picked.map(id=>topicOptions.find(t=>t.id===id)?.name).join(", "),minutes:total,note})}>Save session</button></div></Modal>;
+}
+function TimerBar({timer,data,onPause,onResume,onSwitch,onEnd}:{timer:StudyTimer;data:State;onPause:()=>void;onResume:()=>void;onSwitch:()=>void;onEnd:()=>void}) {
+  const ms=timerMs(timer,Date.now()); const paused=timer.runStart===null;
+  const names=timer.topicIds.map(id=>data.topics.find(t=>t.id===id)?.name).filter(Boolean);
+  const code=subjects.find(s=>s.id===timer.subjectId)?.code.split(" · ")[1];
+  return <div className={`timer-bar ${paused?"paused":""} ${ms>LONG_TIMER_MS?"long":""}`}>
+    <span className="timer-dot" aria-hidden="true"/>
+    <div className="grow"><b>{code}{names.length?`: ${names.length===1?names[0]:`${names.length} chapters`}`:""}</b><small>{ms>LONG_TIMER_MS?"Still studying? Tap End to check the time.":paused?"Paused":"Timing your study"}</small></div>
+    <strong className="timer-time" aria-label="Time studied">{fmtClock(ms)}</strong>
+    {paused?<button className="timer-btn" aria-label="Resume timer" title="Resume" onClick={onResume}><Play size={18}/></button>:<button className="timer-btn" aria-label="Pause timer" title="Pause" onClick={onPause}><Pause size={18}/></button>}
+    <button className="timer-btn" aria-label="Switch paper" title="Switch paper" onClick={onSwitch}><ArrowLeftRight size={18}/></button>
+    <button className="timer-btn end" aria-label="End timer" title="End" onClick={onEnd}><Square size={16}/></button>
+  </div>;
 }
 function InstallIosModal({onClose}:{onClose:()=>void}) {
   return <Modal title="Install on iPhone" onClose={onClose}><p className="muted modal-desc">Apple only allows installing from Safari's Share menu. It takes three taps:</p><ol className="install-steps"><li>Tap the <b>Share</b> button <Share size={17} aria-label="Share icon"/> at the bottom of Safari (top right on iPad).</li><li>Scroll down and tap <b>Add to Home Screen</b> <SquarePlus size={17} aria-label="Add icon"/>.</li><li>Tap <b>Add</b>. The black CA icon appears on your home screen.</li></ol><div className="modal-actions"><button className="primary" onClick={onClose}>Got it</button></div></Modal>;

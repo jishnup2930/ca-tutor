@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import App, { QUOTES, advanceQuote, nextQuote, normalise, syllabusTopics, ymd } from "./App";
+import App, { QUOTES, advanceQuote, fmtClock, nextQuote, normalise, pauseTimer, resumeTimer, startTimer, syllabusTopics, timerMs, timerSession, ymd } from "./App";
 
 const KEY = "ca-final-companion-v1";
 window.scrollTo = () => {}; // jsdom has no layout, so it does not implement scrolling
@@ -308,6 +308,149 @@ describe("user flows", () => {
     expect(within(row).getByText("Planned")).toBeTruthy();
     fireEvent.click(row.querySelector(".topic-check")!);
     expect(within(row).getByText("Completed")).toBeTruthy();
+  });
+});
+
+describe("study timer", () => {
+  const MIN = 60_000;
+  const chapter = (id: string, name: string, status = "Not started") => ({ id, subjectId: "fr", chapter: "Module 1", name, status, difficulty: "Medium", notes: "", resource: "" });
+  const seed = () => localStorage.setItem(KEY, JSON.stringify({ topics: [chapter("c1", "Ind AS 115"), chapter("c2", "Ind AS 116", "Completed"), chapter("c3", "Ind AS 109"), { ...chapter("d1", "Capital Gains"), subjectId: "dt" }], sessions: [] }));
+  const stored = () => JSON.parse(localStorage.getItem(KEY)!);
+  const modal = () => within(document.querySelector(".modal") as HTMLElement);
+  let now = 0;
+  // Jump the clock forward; the last second is ticked so the timer bar redraws.
+  const wait = (ms: number) => { vi.setSystemTime(now + ms - 1000); act(() => { vi.advanceTimersByTime(1000); }); now += ms; };
+  const startFrom = (names: string[], paper?: string) => {
+    if (paper) fireEvent.change(modal().getAllByRole("combobox")[0], { target: { value: paper } });
+    for (const n of names) fireEvent.click(modal().getByLabelText(n));
+  };
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] }); now = new Date(2026, 10, 10, 9, 0).getTime(); vi.setSystemTime(now); seed(); });
+  afterEach(() => { vi.useRealTimers(); localStorage.removeItem("ca-final-companion-timer"); });
+
+  it("time comes from the clock: pauses are not counted", () => {
+    let t = startTimer("fr", [], 0);
+    t = pauseTimer(t, 25 * MIN);
+    expect(timerMs(t, 35 * MIN)).toBe(25 * MIN); // paused for 10 minutes
+    t = resumeTimer(t, 35 * MIN);
+    expect(timerMs(t, 55 * MIN)).toBe(45 * MIN);
+    expect(resumeTimer(t, 60 * MIN)).toBe(t); // resuming a running timer changes nothing
+    expect(fmtClock(45 * MIN + 7000)).toBe("0:45:07");
+  });
+
+  it("a finished timer becomes a log entry dated the day it started, with all its chapters", () => {
+    const started = new Date(2026, 10, 10, 23, 50).getTime();
+    const s = timerSession(startTimer("fr", ["c1", "c3"], started), 50 * MIN + 29_000, [chapter("c1", "Ind AS 115"), chapter("c3", "Ind AS 109")]);
+    expect(s).toMatchObject({ date: "2026-11-10", subjectId: "fr", topicIds: ["c1", "c3"], topicId: "c1", topicName: "Ind AS 115, Ind AS 109", minutes: 50 });
+  });
+
+  it("start, pause for a break, resume, end: saves the study time and marks chapters Learning", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Start timer" }));
+    startFrom(["Ind AS 115", "Ind AS 116"]);
+    fireEvent.click(modal().getByRole("button", { name: "Start timer" }));
+    expect(screen.getByRole("button", { name: "Timer running" })).toHaveProperty("disabled", true);
+    wait(25 * MIN);
+    expect(document.querySelector(".timer-time")!.textContent).toBe("0:25:00");
+    fireEvent.click(screen.getByRole("button", { name: "Pause timer" }));
+    wait(10 * MIN); // tea break
+    expect(document.querySelector(".timer-time")!.textContent).toBe("0:25:00");
+    fireEvent.click(screen.getByRole("button", { name: "Resume timer" }));
+    wait(20 * MIN);
+    fireEvent.click(screen.getByRole("button", { name: "End timer" }));
+    const [h, m] = modal().getAllByRole("spinbutton") as HTMLInputElement[];
+    expect([h.value, m.value]).toEqual(["0", "45"]);
+    fireEvent.click(modal().getByRole("button", { name: "Save session" }));
+    const data = stored();
+    expect(data.sessions).toHaveLength(1);
+    expect(data.sessions[0]).toMatchObject({ date: "2026-11-10", subjectId: "fr", minutes: 45, topicIds: ["c1", "c2"], topicName: "Ind AS 115, Ind AS 116" });
+    expect(data.topics.find((t: { id: string }) => t.id === "c1").status).toBe("Learning");
+    expect(data.topics.find((t: { id: string }) => t.id === "c2").status).toBe("Completed"); // never downgraded
+    expect(document.querySelector(".timer-bar")).toBeNull();
+    expect(localStorage.getItem("ca-final-companion-timer")).toBeNull();
+  });
+
+  it("keeps counting while the app is closed, and picks up where it was", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Start timer" }));
+    fireEvent.click(modal().getByRole("button", { name: "Start timer" }));
+    cleanup(); // app closed / phone locked
+    wait(30 * MIN);
+    render(<App />);
+    expect(document.querySelector(".timer-time")!.textContent).toBe("0:30:00");
+  });
+
+  it("under a minute: stops without saving", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Start timer" }));
+    fireEvent.click(modal().getByRole("button", { name: "Start timer" }));
+    wait(30_000);
+    fireEvent.click(screen.getByRole("button", { name: "End timer" }));
+    expect(screen.getByText(/Under a minute, so nothing was saved/)).toBeTruthy();
+    expect(stored().sessions).toHaveLength(0);
+    expect(document.querySelector(".timer-bar")).toBeNull();
+  });
+
+  it("after 5 hours asks 'Still studying?' and lets her fix the time before saving", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Start timer" }));
+    fireEvent.click(modal().getByRole("button", { name: "Start timer" }));
+    wait(4 * 60 * MIN);
+    expect(document.querySelector(".timer-bar")!.textContent).not.toMatch(/Still studying/);
+    wait(3 * 60 * MIN); // forgot to stop it
+    expect(document.querySelector(".timer-bar")!.textContent).toMatch(/Still studying/);
+    fireEvent.click(screen.getByRole("button", { name: "End timer" }));
+    expect(modal().getByRole("alert").textContent).toMatch(/Still studying\? The timer ran 7h 0m/);
+    const [h] = modal().getAllByRole("spinbutton");
+    fireEvent.change(h, { target: { value: "2" } });
+    fireEvent.click(modal().getByRole("button", { name: "Save session" }));
+    expect(stored().sessions[0].minutes).toBe(120);
+  });
+
+  it("switching paper saves the time so far as its own entry and carries on", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Start timer" }));
+    startFrom(["Ind AS 109"]);
+    fireEvent.click(modal().getByRole("button", { name: "Start timer" }));
+    wait(40 * MIN);
+    fireEvent.click(screen.getByRole("button", { name: "Switch paper" }));
+    startFrom(["Capital Gains"], "dt");
+    fireEvent.click(modal().getByRole("button", { name: "Switch" }));
+    expect(screen.getByText(/Saved 0h 40m on FR\. Now timing DT/)).toBeTruthy();
+    expect(stored().sessions).toMatchObject([{ subjectId: "fr", minutes: 40, topicIds: ["c3"] }]);
+    wait(15 * MIN);
+    fireEvent.click(screen.getByRole("button", { name: "End timer" }));
+    fireEvent.click(modal().getByRole("button", { name: "Save session" }));
+    expect(stored().sessions.map((x: { subjectId: string; minutes: number }) => [x.subjectId, x.minutes])).toEqual([["fr", 40], ["dt", 15]]);
+    expect(stored().topics.filter((t: { status: string }) => t.status === "Learning").map((t: { id: string }) => t.id)).toEqual(["c3", "d1"]);
+  });
+
+  it("End then 'Keep timing' carries on; Discard throws the session away", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Start timer" }));
+    fireEvent.click(modal().getByRole("button", { name: "Start timer" }));
+    wait(10 * MIN);
+    fireEvent.click(screen.getByRole("button", { name: "End timer" }));
+    fireEvent.click(modal().getByRole("button", { name: "Keep timing" }));
+    expect(document.querySelector(".timer-bar")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "End timer" }));
+    fireEvent.click(modal().getByRole("button", { name: "Discard" }));
+    expect(stored().sessions).toHaveLength(0);
+    expect(document.querySelector(".timer-bar")).toBeNull();
+  });
+
+  it("manual log can hold several chapters and marks them Learning too", () => {
+    render(<App />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Log study time" })[0]);
+    startFrom(["Ind AS 115", "Ind AS 109"]);
+    fireEvent.click(modal().getByRole("button", { name: "Save session" }));
+    expect(stored().sessions[0]).toMatchObject({ minutes: 60, topicIds: ["c1", "c3"], topicName: "Ind AS 115, Ind AS 109" });
+    expect(stored().topics.filter((t: { status: string }) => t.status === "Learning")).toHaveLength(2);
+  });
+
+  it("ignores a damaged saved timer", () => {
+    localStorage.setItem("ca-final-companion-timer", '{"subjectId":"fr","topicIds":"oops"}');
+    render(<App />);
+    expect(document.querySelector(".timer-bar")).toBeNull();
   });
 });
 

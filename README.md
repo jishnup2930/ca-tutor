@@ -12,7 +12,8 @@ A personal, frontend-only CA Final preparation app built with React, Vite and Ty
 - User-managed MCQ bank with answer explanations and practice mode
 - Flashcards for active recall
 - Revision planner with revision cycles
-- Flexible study-time logging (manual duration, multiple sessions per day, no fixed daily target)
+- Flexible study-time logging (manual duration, multiple sessions per day, several chapters per entry, no fixed daily target)
+- Study timer: start, pause for breaks, switch paper, end; saves to the study log automatically, keeps running while the app is closed, and asks "Still studying?" after 5 hours
 - Weekly, monthly and subject-wise analytics
 - JSON backup and restore
 - Responsive layout and installable web-app manifest
