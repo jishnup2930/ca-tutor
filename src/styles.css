@@ -138,6 +138,9 @@ h1, h2, h3 { margin: 0; letter-spacing: -.02em; }
 .personal-note::after { content: ""; position: absolute; right: -40px; top: -40px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 141, 181, .22), rgba(139, 92, 246, 0) 70%); pointer-events: none; }
 .note-body { flex: 1; min-width: 0; position: relative; z-index: 1; }
 .note-body h2 { font-size: 21px; font-weight: 800; }
+.note-head { display: flex; align-items: center; gap: 8px; }
+.note-next { width: 32px; height: 32px; padding: 0; flex-shrink: 0; color: var(--pink); background: #fdebf2; }
+.note-next:hover { background: #fbd9e6; color: var(--pink); }
 .note-text { font-size: 17px; line-height: 1.55; color: var(--ink); margin: 10px 0 6px; max-width: 46ch; }
 .note-sign { font-size: 15px; font-weight: 700; color: var(--pink); margin: 0; }
 .note-art { width: 132px; height: auto; flex-shrink: 0; position: relative; z-index: 1; filter: drop-shadow(0 12px 18px rgba(229, 72, 127, .28)); }

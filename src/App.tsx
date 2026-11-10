@@ -5,7 +5,7 @@ import {
   FileText, GraduationCap, Home, Layers, ListChecks, Menu, Plus, Search,
   Settings, Sparkles, Trash2, X, ClipboardList, RotateCcw, ArrowLeft,
   Star, TrendingUp, ShieldCheck, Landmark, Receipt, Briefcase, Download, Share, SquarePlus,
-  Timer as TimerIcon, Play, Pause, Square, ArrowLeftRight
+  Timer as TimerIcon, Play, Pause, Square, ArrowLeftRight, RefreshCw
 } from "lucide-react";
 import { SYLLABUS } from "./syllabus";
 
@@ -382,7 +382,7 @@ export default function App() {
       <header className="topbar">{page !== "Dashboard" && <button className="icon-btn" aria-label="Back" title="Back" onClick={back}><ArrowLeft size={18}/></button>}<div className="top-actions"><span className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div></header>
       {timer && <TimerBar timer={timer} data={data} onPause={() => setTimer(pauseTimer(timer, Date.now()))} onResume={() => setTimer(resumeTimer(timer, Date.now()))} onSwitch={() => setModal("timer-switch")} onEnd={endTimer}/>}
       <div className="content">
-        {page === "Dashboard" && <Dashboard data={data} timing={!!timer} onTimer={() => setModal("timer-start")} quote={QUOTES[quote.i]} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
+        {page === "Dashboard" && <Dashboard data={data} onNextNote={() => { loadQuote = advanceQuote(loadQuote); setQuote(loadQuote); }} timing={!!timer} onTimer={() => setModal("timer-start")} quote={QUOTES[quote.i]} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
         {page === "Syllabus" && <Syllabus data={data} selected={selectedSubject} setSelected={setSelectedSubject} search={search} setSearch={setSearch} onAdd={() => setModal("topic")} onLoad={loadSyllabus} onUpdate={updateTopic} onDelete={id => update({topics:data.topics.filter(t=>t.id!==id)})}/>}
         {page === "Learn & Notes" && <Learn data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAddNote={note => {update({notes:[...data.notes,note]});notify("Note saved");}} onDeleteNote={id => update({notes:data.notes.filter(n=>n.id!==id)})} onUpdateTopic={updateTopic}/>}
         {page === "Practice" && <Practice data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAdd={q => {update({questions:[...data.questions,q]});notify("Question added");}}/>}
@@ -436,7 +436,7 @@ const QUICK = [
   { page: "Revision", label: "Revision", Icon: RotateCcw, color: "var(--orange)" },
   { page: "Learn & Notes", label: "Learn & Notes", Icon: FileText, color: "var(--blue)" }
 ];
-function Dashboard({data,timing,onTimer,quote,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data:State;timing:boolean;onTimer:()=>void;quote:string;totalMinutes:number;progress:number;onNavigate:(s:string)=>void;onAdd:()=>void;onSubject:(id:string)=>void}) {
+function Dashboard({data,onNextNote,timing,onTimer,quote,totalMinutes,progress,onNavigate,onAdd,onSubject}:{data:State;onNextNote:()=>void;timing:boolean;onTimer:()=>void;quote:string;totalMinutes:number;progress:number;onNavigate:(s:string)=>void;onAdd:()=>void;onSubject:(id:string)=>void}) {
   const next = data.revisions.filter(r=>!r.done).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
   const lastTopic = [...data.sessions].sort((a,b)=>b.date.localeCompare(a.date))[0];
   const done = data.topics.filter(t=>t.status==="Completed").length;
@@ -445,7 +445,7 @@ function Dashboard({data,timing,onTimer,quote,totalMinutes,progress,onNavigate,o
   return <>
     <section className="hello"><div><h1>Hi, <b>{NAME}</b></h1><p>{todayMins ? `You've studied ${fmtHours(todayMins).replace(/^0h /, "").replace(/ 0m$/, "")} today.` : "Ready for today's first session?"}</p></div><img className="hello-figure" src="./meghana-figure.webp" alt="" width={210} height={560}/></section>
     <div className="dash-top">
-      <section className="personal-note"><div className="note-body"><h2>A little love note</h2><p className="note-text">{quote}</p><p className="note-sign">With love, Jishnu Pedengal</p></div><HeartArt/><div className="note-actions pair"><button className="primary" onClick={onTimer} disabled={timing}><TimerIcon size={18}/> {timing ? "Timer running" : "Start timer"}</button><button className="secondary" onClick={onAdd}><Plus size={18}/> Log study time</button></div></section>
+      <section className="personal-note"><div className="note-body"><div className="note-head"><h2>A little love note</h2><button className="icon-btn note-next" aria-label="Show another note" title="Another note" onClick={onNextNote}><RefreshCw size={16}/></button></div><p className="note-text">{quote}</p><p className="note-sign">With love, Jishnu Pedengal</p></div><HeartArt/><div className="note-actions pair"><button className="primary" onClick={onTimer} disabled={timing}><TimerIcon size={18}/> {timing ? "Timer running" : "Start timer"}</button><button className="secondary" onClick={onAdd}><Plus size={18}/> Log study time</button></div></section>
       <button className="progress-card" onClick={()=>onNavigate("Syllabus")}>
         <div className="pc-head"><div><span className="pc-icon"><Layers size={18}/></span><b>Syllabus progress</b><small>{done} of {data.topics.length} chapters done</small></div><div className="pc-big">{progress}<span>%</span></div></div>
         <div className="slider"><span style={{width:`${progress}%`}}/></div>

@@ -78,6 +78,15 @@ describe("startup and storage", () => {
     expect(screen.getByText("Ready for today's first session?")).toBeTruthy();
   });
 
+  it("the small refresh icon shows the next note without reloading", () => {
+    render(<App />);
+    const shown = QUOTES.indexOf(document.querySelector(".note-text")!.textContent!);
+    fireEvent.click(screen.getByRole("button", { name: "Show another note" }));
+    expect(document.querySelector(".note-text")!.textContent).toBe(QUOTES[(shown + 1) % QUOTES.length]);
+    nav("Syllabus"); nav("Dashboard"); // and it stays on that note when moving around
+    expect(document.querySelector(".note-text")!.textContent).toBe(QUOTES[(shown + 1) % QUOTES.length]);
+  });
+
   it("shows the next note when the app comes back on a new day without reloading", () => {
     render(<App />);
     const shown = QUOTES.indexOf(document.querySelector(".note-text")!.textContent!);
