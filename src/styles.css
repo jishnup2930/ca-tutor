@@ -251,6 +251,10 @@ h1, h2, h3 { margin: 0; letter-spacing: -.02em; }
 .text-input, .textarea, .select-input { width: 100%; border: 1.5px solid var(--line); border-radius: 14px; background: #fafbfc; padding: 12px 14px; font-size: 15px; outline: none; }
 .text-input:focus, .textarea:focus, .select-input:focus { border-color: var(--violet); background: #fff; box-shadow: 0 0 0 4px var(--violet-soft); }
 .textarea { resize: vertical; line-height: 1.55; }
+/* iPhone Safari draws date/month boxes at their own fixed width, ignoring width: 100%,
+   which made the Log study time sheet wider than the screen. Reset to a plain box. */
+input[type="date"], input[type="month"] { -webkit-appearance: none; appearance: none; display: block; min-width: 0; min-height: 48px; }
+input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-date-and-time-value { text-align: left; }
 .form-panel { max-width: 780px; }
 .form-panel > .primary { margin-top: 18px; }
 .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 4px; }
@@ -378,7 +382,7 @@ input[type="radio"] { accent-color: var(--violet); width: 18px; height: 18px; }
 
 /* ---------- Modal and toast ---------- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(23, 24, 29, .35); backdrop-filter: blur(3px); z-index: 50; display: grid; place-items: center; padding: 16px; }
-.modal { background: var(--card); border-radius: 28px; width: min(100%, 480px); max-height: 90vh; overflow: auto; padding: 24px; box-shadow: 0 24px 60px rgba(23, 24, 29, .2); }
+.modal { background: var(--card); border-radius: 28px; width: min(100%, 480px); max-height: 90vh; overflow-y: auto; overflow-x: hidden; padding: 24px; box-shadow: 0 24px 60px rgba(23, 24, 29, .2); }
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .modal-head h2 { font-size: 21px; font-weight: 800; }
 .modal-head .icon-btn { background: #f2f3f7; width: 38px; height: 38px; }
