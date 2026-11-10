@@ -8,6 +8,8 @@ import {
   Timer as TimerIcon, Play, Pause, Square, ArrowLeftRight, RefreshCw
 } from "lucide-react";
 import { SYLLABUS } from "./syllabus";
+import { loadBank } from "./bank";
+import type { Bank } from "./bank/types";
 
 type Subject = { id: string; name: string; code: string; group: string; color: string; };
 type Topic = { id: string; subjectId: string; chapter: string; name: string; status: "Not started" | "Learning" | "Completed"; difficulty: "Easy" | "Medium" | "Difficult"; notes: string; resource: string; };
@@ -18,7 +20,9 @@ type Flashcard = { id: string; subjectId: string; front: string; back: string; }
 type Revision = { id: string; topicId: string; date: string; cycle: string; done: boolean; };
 // Chrome/Edge/Android fire this when the app can be installed; not in TypeScript's DOM types.
 type InstallPromptEvent = Event & { prompt: () => Promise<unknown> };
-type State = { subjects: Subject[]; topics: Topic[]; sessions: Session[]; notes: Note[]; questions: Question[]; flashcards: Flashcard[]; revisions: Revision[]; };
+// One entry per practice question she has got right (built-in or her own); firstTry = no wrong taps before it.
+type Answered = { id: string; firstTry: boolean };
+type State = { subjects: Subject[]; topics: Topic[]; sessions: Session[]; notes: Note[]; questions: Question[]; flashcards: Flashcard[]; revisions: Revision[]; answered: Answered[]; };
 
 const subjects: Subject[] = [
   { id: "fr", name: "Financial Reporting", code: "Paper 1 · FR", group: "Group I", color: "#8b5cf6" },
@@ -144,8 +148,8 @@ const pageFromUrl = () => {
   catch { return "Dashboard"; } // malformed link
 };
 
-const LISTS = ["topics", "sessions", "notes", "questions", "flashcards", "revisions"] as const;
-const emptyState: State = { subjects, topics: [], sessions: [], notes: [], questions: [], flashcards: [], revisions: [] };
+const LISTS = ["topics", "sessions", "notes", "questions", "flashcards", "revisions", "answered"] as const;
+const emptyState: State = { subjects, topics: [], sessions: [], notes: [], questions: [], flashcards: [], revisions: [], answered: [] };
 
 const KEY = "ca-final-companion-v1";
 // Local YYYY-MM-DD; toISOString() would give the UTC date (yesterday in IST before 05:30).
@@ -173,7 +177,8 @@ const REQUIRED: Record<typeof LISTS[number], Record<string, string>> = {
   notes: { id: "string", subjectId: "string", title: "string", body: "string", updated: "string" },
   questions: { id: "string", subjectId: "string", prompt: "string", answer: "number" },
   flashcards: { id: "string", subjectId: "string", front: "string", back: "string" },
-  revisions: { id: "string", topicId: "string", date: "string", cycle: "string", done: "boolean" }
+  revisions: { id: "string", topicId: "string", date: "string", cycle: "string", done: "boolean" },
+  answered: { id: "string", firstTry: "boolean" }
 };
 const isValid = (k: typeof LISTS[number], x: unknown) => {
   if (!x || typeof x !== "object") return false;
@@ -385,7 +390,7 @@ export default function App() {
         {page === "Dashboard" && <Dashboard data={data} onNextNote={() => { loadQuote = advanceQuote(loadQuote); setQuote(loadQuote); }} timing={!!timer} onTimer={() => setModal("timer-start")} quote={QUOTES[quote.i]} totalMinutes={totalMinutes} progress={progress} onNavigate={go} onAdd={() => setModal("session")} onSubject={id => {setSelectedSubject(id); go("Syllabus");}}/>}
         {page === "Syllabus" && <Syllabus data={data} selected={selectedSubject} setSelected={setSelectedSubject} search={search} setSearch={setSearch} onAdd={() => setModal("topic")} onLoad={loadSyllabus} onUpdate={updateTopic} onDelete={id => update({topics:data.topics.filter(t=>t.id!==id)})}/>}
         {page === "Learn & Notes" && <Learn data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAddNote={note => {update({notes:[...data.notes,note]});notify("Note saved");}} onDeleteNote={id => update({notes:data.notes.filter(n=>n.id!==id)})} onUpdateTopic={updateTopic}/>}
-        {page === "Practice" && <Practice data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAdd={q => {update({questions:[...data.questions,q]});notify("Question added");}}/>}
+        {page === "Practice" && <Practice data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAdd={q => {update({questions:[...data.questions,q]});notify("Question added");}} onSolved={a => setData(prev => prev.answered.some(x => x.id === a.id) ? prev : { ...prev, answered: [...prev.answered, a] })} onRetest={ids => setData(prev => ({ ...prev, answered: prev.answered.filter(x => !ids.includes(x.id)) }))}/>}
         {page === "Flashcards" && <Flashcards data={data} selected={selectedSubject} setSelected={setSelectedSubject} onAdd={f => {update({flashcards:[...data.flashcards,f]});notify("Flashcard added");}} onDelete={id=>update({flashcards:data.flashcards.filter(f=>f.id!==id)})}/>}
         {page === "Revision" && <RevisionPage data={data} onAdd={r=>{update({revisions:[...data.revisions,r]});notify("Revision scheduled");}} onToggle={id=>update({revisions:data.revisions.map(r=>r.id===id?{...r,done:!r.done}:r)})}/>}
         {page === "Study Log" && <StudyLog data={data} timing={!!timer} onTimer={() => setModal("timer-start")} onAdd={() => setModal("session")} onDelete={id=>update({sessions:data.sessions.filter(s=>s.id!==id)})}/>}
@@ -457,7 +462,7 @@ function Dashboard({data,onNextNote,timing,onTimer,quote,totalMinutes,progress,o
     <div className="stats-grid">
       <Stat icon={<Clock3/>} label="Study time" value={fmtHours(totalMinutes)} sub="All sessions"/>
       <Stat icon={<Star/>} label="Chapters done" value={`${done}`} sub={`${data.topics.length} in your syllabus`}/>
-      <Stat icon={<Brain/>} label="Questions" value={`${data.questions.length}`} sub="In your question bank"/>
+      <Stat icon={<Brain/>} label="Questions done" value={`${data.answered.length}`} sub="Practice questions answered"/>
     </div>
     <div className="section-heading"><div><h2>Your papers</h2><p className="muted">Open a paper to see its chapters.</p></div><button className="text-btn" onClick={()=>onNavigate("Syllabus")}>View syllabus <ChevronRight size={16}/></button></div>
     <div className="subject-grid">{data.subjects.map(s=>{const st=paper(s.id);const Icon=SUBJECT_ICON[s.id]??BookOpen;return <button className="subject-card" key={s.id} onClick={()=>onSubject(s.id)}><span className="chip soft" style={tint(s.color)}><Icon/></span><div className="grow"><b>{s.name}</b><small>{st.done} of {st.all} chapters done</small><div className="subject-progress"><span style={{width:`${st.pct}%`,background:s.color}}/></div></div><span className="pct">{st.pct}%</span></button>})}</div>
@@ -507,15 +512,62 @@ function Learn({data,selected,setSelected,onAddNote,onDeleteNote,onUpdateTopic}:
   </>;
 }
 
-function Practice({data,selected,setSelected,onAdd}:{data:State;selected:string;setSelected:(s:string)=>void;onAdd:(q:Question)=>void}) {
-  const [mode,setMode]=useState<"quiz"|"add">("quiz"); const [idx,setIdx]=useState(0); const [answer,setAnswer]=useState<number|null>(null); const [show,setShow]=useState(false);
+function Practice({data,selected,setSelected,onAdd,onSolved,onRetest}:{data:State;selected:string;setSelected:(s:string)=>void;onAdd:(q:Question)=>void;onSolved:(a:Answered)=>void;onRetest:(ids:string[])=>void}) {
+  const [mode,setMode]=useState<"quiz"|"add">("quiz");
   const [topicId,setTopicId]=useState(""); const [prompt,setPrompt]=useState(""); const [opts,setOpts]=useState(["","","",""]); const [correct,setCorrect]=useState("0"); const [explanation,setExplanation]=useState("");
-  const qs=data.questions.filter(q=>q.subjectId===selected); const q=qs[idx];
-  return <><PageTitle title="Practice & test" desc="Build a personal question bank and test your understanding." action={<button className="primary" onClick={()=>setMode(mode==="add"?"quiz":"add")}>{mode==="add"?<X size={16}/>:<Plus size={16}/>} {mode==="add"?"Close":"Add question"}</button>}/>
-    <SubjectPicker selected={selected} setSelected={s=>{setSelected(s);setIdx(0);setAnswer(null);setShow(false);}}/>
-    {mode==="add"?<section className="panel form-panel"><h2>Add a multiple-choice question</h2><p className="muted">Add questions from your own notes or permitted study resources.</p><label className="field-label">Question</label><textarea className="textarea" rows={3} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Enter the question..."/><label className="field-label">Link to topic</label><select className="select-input" value={topicId} onChange={e=>setTopicId(e.target.value)}><option value="">Choose topic (optional)</option>{data.topics.filter(t=>t.subjectId===selected).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>{opts.map((o,i)=><div className="option-edit" key={i}><input className="text-input" value={o} onChange={e=>setOpts(opts.map((v,j)=>i===j?e.target.value:v))} placeholder={`Option ${i+1}`}/><label><input type="radio" name="correct" checked={correct===String(i)} onChange={()=>setCorrect(String(i))}/> Correct</label></div>)}<label className="field-label">Explanation</label><textarea className="textarea" rows={2} value={explanation} onChange={e=>setExplanation(e.target.value)} placeholder="Why is this the correct answer?"/><button className="primary" disabled={!prompt.trim()||opts.some(o=>!o.trim())} onClick={()=>{onAdd({id:uid(),subjectId:selected,topicId,prompt,options:opts,answer:Number(correct),explanation});setPrompt("");setOpts(["","","",""]);setExplanation("");setMode("quiz");}}>Save question</button></section>:<section className="panel quiz-panel">{qs.length?<><div className="quiz-meta"><span>Question {idx+1} of {qs.length}</span><span>{data.topics.find(t=>t.id===q.topicId)?.name||"General"}</span></div><h2>{q.prompt}</h2><div className="quiz-options">{q.options.map((o,i)=><button key={i} disabled={show} className={`quiz-option ${answer===i?"picked":""} ${show&&i===q.answer?"correct":show&&answer===i?"incorrect":""}`} onClick={()=>setAnswer(i)}><span>{String.fromCharCode(65+i)}</span>{o}{show&&i===q.answer&&<Check size={17}/>}</button>)}</div>{show&&<div className="explanation"><b>{answer===q.answer?"Correct!":"Let's review this one."}</b><p>{q.explanation||"No explanation added yet. You can review this topic in your notes."}</p></div>}<div className="quiz-actions">{!show?<button className="primary" disabled={answer===null} onClick={()=>setShow(true)}>Check answer</button>:<button className="primary" onClick={()=>{setIdx((idx+1)%qs.length);setAnswer(null);setShow(false);}}>Next question <ChevronRight size={16}/></button>}</div></>:<div className="empty-large"><div className="empty-icon"><ClipboardList size={24}/></div><h3>Your question bank starts here</h3><p>Add MCQs with answer explanations. You can organise them by subject and topic, then practise them here whenever you revise.</p><button className="primary" onClick={()=>setMode("add")}><Plus size={16}/> Add first question</button></div>}</section>}
+  return <><PageTitle title="Practice & test" desc="Tough MCQs for every paper. Tap an answer: green moves you on, red means try again." action={<button className="primary" onClick={()=>setMode(mode==="add"?"quiz":"add")}>{mode==="add"?<X size={16}/>:<Plus size={16}/>} {mode==="add"?"Close":"Add question"}</button>}/>
+    <SubjectPicker selected={selected} setSelected={setSelected}/>
+    {mode==="add"?<section className="panel form-panel"><h2>Add a multiple-choice question</h2><p className="muted">Add questions from your own notes or permitted study resources.</p><label className="field-label">Question</label><textarea className="textarea" rows={3} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Enter the question..."/><label className="field-label">Link to topic</label><select className="select-input" value={topicId} onChange={e=>setTopicId(e.target.value)}><option value="">Choose topic (optional)</option>{data.topics.filter(t=>t.subjectId===selected).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>{opts.map((o,i)=><div className="option-edit" key={i}><input className="text-input" value={o} onChange={e=>setOpts(opts.map((v,j)=>i===j?e.target.value:v))} placeholder={`Option ${i+1}`}/><label><input type="radio" name="correct" checked={correct===String(i)} onChange={()=>setCorrect(String(i))}/> Correct</label></div>)}<label className="field-label">Explanation</label><textarea className="textarea" rows={2} value={explanation} onChange={e=>setExplanation(e.target.value)} placeholder="Why is this the correct answer?"/><button className="primary" disabled={!prompt.trim()||opts.some(o=>!o.trim())} onClick={()=>{onAdd({id:uid(),subjectId:selected,topicId,prompt,options:opts,answer:Number(correct),explanation});setPrompt("");setOpts(["","","",""]);setExplanation("");setMode("quiz");}}>Save question</button></section>:<PracticeRun key={selected} data={data} paper={selected} onSolved={onSolved} onRetest={onRetest}/>}
   </>;
 }
+// A practice question from the built-in bank or one she added herself.
+type PracticeQ = { id: string; prompt: string; options: string[]; answer: number; explanation: string; label: string; caseId?: string };
+// Time to read the explanation before moving on: ~6 s for a short one, up to ~14 s for the longest.
+export const readingTime = (text: string) => Math.min(14000, Math.max(6000, 3000 + text.length * 50));
+function PracticeRun({data,paper,onSolved,onRetest}:{data:State;paper:string;onSolved:(a:Answered)=>void;onRetest:(ids:string[])=>void}) {
+  const [bank,setBank]=useState<Bank|null>(null); const [failed,setFailed]=useState(false);
+  const [currentId,setCurrentId]=useState<string|null>(null); const [wrong,setWrong]=useState<number[]>([]); const [solved,setSolved]=useState(false);
+  useEffect(()=>{ let live=true; setFailed(false); loadBank(paper).then(b=>{if(live)setBank(b);},()=>{if(live)setFailed(true);}); return ()=>{live=false;}; },[paper]);
+  // Show questions in syllabus chapter order (stable within a chapter); IBS keeps its case-study grouping.
+  const chapterRank=new Map((SYLLABUS[paper]??[]).flatMap(([,names])=>names).map((n,i)=>[n,i]));
+  const bankQs=paper==="ibs"?(bank?.questions??[]):[...(bank?.questions??[])].sort((a,b)=>(chapterRank.get(a.chapter)??1e9)-(chapterRank.get(b.chapter)??1e9));
+  const list:PracticeQ[]=[...bankQs.map(q=>({id:q.id,prompt:q.prompt,options:q.options,answer:q.answer,explanation:q.explanation,label:q.chapter,caseId:q.caseId})),
+    ...data.questions.filter(q=>q.subjectId===paper).map(q=>({id:q.id,prompt:q.prompt,options:q.options,answer:q.answer,explanation:q.explanation,label:data.topics.find(t=>t.id===q.topicId)?.name||"Your question"}))];
+  const done=new Map(data.answered.map(a=>[a.id,a.firstTry]));
+  const mine=list.filter(q=>done.has(q.id)); const firstTry=mine.filter(q=>done.get(q.id)).length;
+  const q=list.find(x=>x.id===currentId)??list.find(x=>!done.has(x.id));
+  const panel=useRef<HTMLElement>(null); const feedback=useRef<HTMLDivElement>(null); const nextBtn=useRef<HTMLButtonElement>(null);
+  const smooth=()=>(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches?"auto":"smooth") as ScrollBehavior;
+  const next=()=>{setCurrentId(null);setWrong([]);setSolved(false);
+    // On phones a long question can leave the next one scrolled past; start it at the top.
+    const top=panel.current?.getBoundingClientRect().top; if(top!==undefined&&top<0)panel.current?.scrollIntoView?.({behavior:smooth(),block:"start"});};
+  useEffect(()=>{ if(!solved)return;
+    feedback.current?.scrollIntoView?.({behavior:smooth(),block:"nearest"}); // make sure she sees the explanation
+    nextBtn.current?.focus({preventScroll:true}); // the tapped option is now disabled; keep keyboard focus useful
+    const t=window.setTimeout(next,readingTime(q?.explanation??"")); return ()=>window.clearTimeout(t); },[solved]);
+  const pick=(i:number)=>{
+    if(!q||solved||wrong.includes(i))return;
+    setCurrentId(q.id); // keep this question on screen while its explanation shows
+    if(i!==q.answer){setWrong([...wrong,i]);return;}
+    setSolved(true); onSolved({id:q.id,firstTry:wrong.length===0});
+  };
+  const retest=()=>{ if(confirm(`Show all ${list.length} ${paperName(paper)} questions again? Your ticks for this paper will be cleared.`)){ onRetest(list.map(x=>x.id)); next(); } };
+  if(failed) return <section className="panel quiz-panel"><div className="empty-large"><h3>Couldn't load the questions</h3><p>Check your internet connection, then reload the app. Your progress is saved.</p><button className="primary" onClick={()=>location.reload()}>Reload</button></div></section>;
+  if(!bank) return <section className="panel quiz-panel"><p className="muted">Loading questions…</p></section>;
+  const theCase=q?.caseId?bank.cases?.find(c=>c.id===q.caseId):undefined;
+  const caseNo=theCase?(bank.cases??[]).indexOf(theCase)+1:0;
+  return <>
+    <div className="practice-progress"><div className="grow"><b>{mine.length} of {list.length} done</b><small>{firstTry} right first time</small><div className="bar-track"><span style={{width:`${list.length?mine.length/list.length*100:0}%`,background:"var(--violet)"}}/></div></div>{mine.length>0&&<button className="secondary retest-btn" onClick={retest}><RotateCcw size={15}/> Retest</button>}</div>
+    {!q?<section className="panel quiz-panel"><div className="empty-large"><div className="empty-icon"><Check size={24}/></div><h3>{list.length?`All ${list.length} questions done`:"No questions yet"}</h3><p>{list.length?`${firstTry} right first time. Tap Retest to go through them again.`:"Add your own questions with Add question."}</p>{list.length>0&&<button className="primary" onClick={retest}><RotateCcw size={16}/> Retest</button>}</div></section>:<>
+    {theCase&&<details className="case-card" open key={theCase.id}><summary><b>Case study {caseNo}: {theCase.title}</b></summary>{theCase.text.split(/\n\s*\n/).map((para,i)=><p key={i}>{para}</p>)}</details>}
+    <section className="panel quiz-panel" ref={panel}><div className="quiz-meta"><span>Question {list.indexOf(q)+1} of {list.length}</span><span>{q.label}</span></div><h2>{q.prompt}</h2>
+      <div className="quiz-options">{q.options.map((o,i)=>{const isRight=solved&&i===q.answer, isWrong=wrong.includes(i);return <button key={i} disabled={solved||isWrong} aria-label={`${String.fromCharCode(65+i)}. ${o}${isRight?" (correct)":isWrong?" (wrong)":""}`} className={`quiz-option ${isRight?"correct":isWrong?"incorrect":""}`} onClick={()=>pick(i)}><span>{String.fromCharCode(65+i)}</span>{o}{isRight&&<Check size={17}/>}{isWrong&&<X size={17}/>}</button>;})}</div>
+      <div className="quiz-feedback" aria-live="polite" ref={feedback}>{solved?<div className="explanation solved"><b>{wrong.length?"Got it!":"Correct!"}</b><p>{q.explanation||"No explanation added for this question."}</p></div>:wrong.length?<p className="try-again">Not quite. Try another option.</p>:null}</div>
+      {solved&&<div className="quiz-actions"><button className="primary" ref={nextBtn} onClick={next}>Next question <ChevronRight size={16}/></button></div>}
+    </section></>}
+  </>;
+}
+const paperName=(id:string)=>subjects.find(s=>s.id===id)?.code.split(" · ")[1]??"";
 function Flashcards({data,selected,setSelected,onAdd,onDelete}:{data:State;selected:string;setSelected:(s:string)=>void;onAdd:(f:Flashcard)=>void;onDelete:(id:string)=>void}) {
   const [front,setFront]=useState("");const [back,setBack]=useState("");const [index,setIndex]=useState(0);const [flipped,setFlipped]=useState(false);
   const cards=data.flashcards.filter(f=>f.subjectId===selected); const card=cards[index];
@@ -544,7 +596,7 @@ function Analytics({data}:{data:State}) {
   const max=Math.max(1,...subjects.map(sub=>data.sessions.filter(s=>s.subjectId===sub.id).reduce((n,s)=>n+s.minutes,0)));
   return <><PageTitle title="Study analytics" desc="Where your time is going and how your preparation is progressing."/><div className="stats-grid analytics-stats"><Stat icon={<Clock3/>} label="All-time study" value={fmtHours(all)} sub={`${data.sessions.length} sessions logged`}/><Stat icon={<CalendarDays/>} label="This week" value={fmtHours(week.reduce((n,s)=>n+s.minutes,0))} sub="Since Monday"/><Stat icon={<Activity/>} label="This month" value={fmtHours(month.reduce((n,s)=>n+s.minutes,0))} sub="Current calendar month"/><Stat icon={<ListChecks/>} label="Topics completed" value={`${data.topics.filter(t=>t.status==="Completed").length}`} sub={`Out of ${data.topics.length} added topics`}/></div>
     <section className="panel"><div className="panel-head"><div><h2>Subject-wise study time</h2><p className="muted">All recorded sessions</p></div></div>{subjects.map(s=>{const mins=data.sessions.filter(x=>x.subjectId===s.id).reduce((n,x)=>n+x.minutes,0);const Icon=SUBJECT_ICON[s.id]??BookOpen;return <div className="bar-row" key={s.id}><span className="chip soft" style={tint(s.color)}><Icon/></span><div className="grow"><b>{s.name}</b><div className="bar-track"><span style={{width:`${mins/max*100}%`,background:s.color}}/></div></div><strong>{fmtHours(mins)}</strong></div>})}</section>
-    <div className="two-col"><section className="panel"><h2>Preparation snapshot</h2><div className="snapshot-line"><span>Topics marked completed</span><b>{data.topics.filter(t=>t.status==="Completed").length}</b></div><div className="snapshot-line"><span>Topics currently learning</span><b>{data.topics.filter(t=>t.status==="Learning").length}</b></div><div className="snapshot-line"><span>Notes saved</span><b>{data.notes.length}</b></div><div className="snapshot-line"><span>Flashcards created</span><b>{data.flashcards.length}</b></div></section><section className="panel"><h2>Practice & revision</h2><div className="snapshot-line"><span>Questions in bank</span><b>{data.questions.length}</b></div><div className="snapshot-line"><span>Revisions scheduled</span><b>{data.revisions.length}</b></div><div className="snapshot-line"><span>Revisions completed</span><b>{data.revisions.filter(r=>r.done).length}</b></div><p className="tiny muted">Analytics are based only on information entered in this app. No target hours are assumed.</p></section></div>
+    <div className="two-col"><section className="panel"><h2>Preparation snapshot</h2><div className="snapshot-line"><span>Topics marked completed</span><b>{data.topics.filter(t=>t.status==="Completed").length}</b></div><div className="snapshot-line"><span>Topics currently learning</span><b>{data.topics.filter(t=>t.status==="Learning").length}</b></div><div className="snapshot-line"><span>Notes saved</span><b>{data.notes.length}</b></div><div className="snapshot-line"><span>Flashcards created</span><b>{data.flashcards.length}</b></div></section><section className="panel"><h2>Practice & revision</h2><div className="snapshot-line"><span>Practice questions done</span><b>{data.answered.length}</b></div><div className="snapshot-line"><span>Right first time</span><b>{data.answered.filter(a=>a.firstTry).length}</b></div><div className="snapshot-line"><span>Your own questions</span><b>{data.questions.length}</b></div><div className="snapshot-line"><span>Revisions scheduled</span><b>{data.revisions.length}</b></div><div className="snapshot-line"><span>Revisions completed</span><b>{data.revisions.filter(r=>r.done).length}</b></div><p className="tiny muted">Analytics are based only on information entered in this app. No target hours are assumed.</p></section></div>
   </>;
 }
 function SettingsPage({canInstall,installed,onInstall,onExport,onImport,onReset}:{canInstall:boolean;installed:boolean;onInstall:()=>void;onExport:()=>void;onImport:()=>void;onReset:()=>void}) {

@@ -9,7 +9,7 @@ A personal, frontend-only CA Final preparation app built with React, Vite and Ty
 - ICAI chapter list for all six papers preloaded (FR, AFM, Audit, DT, IDT; IBS case-study areas), plus your own topics
 - Topic progress, difficulty, notes and resource links
 - Learning workspace and personal notes library
-- User-managed MCQ bank with answer explanations and practice mode
+- Practice: 650 original, exam-level MCQs (100+ per paper; IBS as 18 case studies). Wrong answers turn red and can be retried, right ones turn green with a one-line explanation; finished questions are skipped next time and Retest brings them back. Her own questions can still be added.
 - Flashcards for active recall
 - Revision planner with revision cycles
 - Flexible study-time logging (manual duration, multiple sessions per day, several chapters per entry, no fixed daily target)

@@ -1,6 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import App, { QUOTES, advanceQuote, fmtClock, nextQuote, normalise, pauseTimer, resumeTimer, startTimer, syllabusTopics, timerMs, timerSession, ymd } from "./App";
+// A small, fixed question bank so practice tests don't depend on the real 600-question files.
+vi.mock("./bank", () => ({
+  loadBank: async (paper: string) => {
+    if (paper === "dt") throw new Error("offline");
+    if (paper === "fr") return { questions: [
+      { id: "fr-001", chapter: "Ch 1", prompt: "First built-in question?", options: ["W1", "R1", "W1b", "W1c"], answer: 1, explanation: "Because R1." },
+      { id: "fr-002", chapter: "Ch 2", prompt: "Second built-in question?", options: ["R2", "W2", "W2b", "W2c"], answer: 0, explanation: "Because R2." },
+    ] };
+    if (paper === "afm") return { questions: [ // deliberately out of chapter order in the file
+      { id: "afm-001", chapter: "2. Risk Management", prompt: "Chapter two question?", options: ["a", "b", "c", "d"], answer: 0, explanation: "Because a." },
+      { id: "afm-002", chapter: "1. Financial Policy and Corporate Strategy", prompt: "Chapter one question?", options: ["a", "b", "c", "d"], answer: 0, explanation: "Because a." },
+    ] };
+    if (paper === "ibs") return { cases: [{ id: "case-01", title: "Sunrise Foods", text: "Para one about Sunrise.\n\nPara two about its plans." }],
+      questions: [{ id: "ibs-001", chapter: "Strategic Management", caseId: "case-01", prompt: "What should Sunrise do?", options: ["Expand", "Wait", "Sell", "Merge"], answer: 2, explanation: "Selling fits the numbers." }] };
+    return { questions: [] };
+  },
+}));
+import App, { readingTime, QUOTES, advanceQuote, fmtClock, nextQuote, normalise, pauseTimer, resumeTimer, startTimer, syllabusTopics, timerMs, timerSession, ymd } from "./App";
 
 const KEY = "ca-final-companion-v1";
 window.scrollTo = () => {}; // jsdom has no layout, so it does not implement scrolling
@@ -280,18 +297,119 @@ describe("user flows", () => {
     expect(screen.queryByText("Lessee accounting")).toBeNull();
   });
 
-  it("practice: add a question and answer it", () => {
+  it("practice: built-in questions; wrong turns red and she can retry, right turns green and moves on", async () => {
     render(<App />);
     nav("Practice");
+    await screen.findByText("First built-in question?");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); // after loading: waiting for text uses real timers
+    try {
+      expect(screen.getByText("0 of 2 done")).toBeTruthy();
+      const opt = (label: string) => screen.getByText(label).closest("button")!;
+      fireEvent.click(opt("W1"));
+      expect(opt("W1").className).toContain("incorrect");
+      expect(opt("W1")).toHaveProperty("disabled", true);
+      expect(screen.getByText(/Not quite/)).toBeTruthy();
+      fireEvent.click(opt("R1"));
+      expect(opt("R1").className).toContain("correct");
+      expect(screen.getByText("Because R1.")).toBeTruthy();
+      expect(screen.getByText("1 of 2 done")).toBeTruthy();
+      expect(JSON.parse(localStorage.getItem(KEY)!).answered).toEqual([{ id: "fr-001", firstTry: false }]);
+      act(() => { vi.advanceTimersByTime(readingTime("Because R1.") - 1); });
+      expect(screen.getByText("Because R1.")).toBeTruthy(); // still reading
+      act(() => { vi.advanceTimersByTime(1); }); // then moves on by itself
+      expect(screen.getByText("Second built-in question?")).toBeTruthy();
+      fireEvent.click(opt("R2"));
+      fireEvent.click(screen.getByRole("button", { name: /Next question/ })); // or straight away
+      expect(screen.getByText("All 2 questions done")).toBeTruthy();
+      expect(screen.getAllByText(/1 right first time/).length).toBe(2); // progress bar and the "all done" message
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("practice: finished questions are hidden next time; Retest brings them all back", async () => {
+    localStorage.setItem(KEY, JSON.stringify({ topics: [], sessions: [], answered: [{ id: "fr-001", firstTry: true }, { id: "other-9", firstTry: true }] }));
+    render(<App />);
+    nav("Practice");
+    expect(await screen.findByText("Second built-in question?")).toBeTruthy(); // fr-001 is skipped
+    expect(screen.getByText("1 of 2 done")).toBeTruthy();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: /Retest/ }));
+    expect(screen.getByText("First built-in question?")).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem(KEY)!).answered).toEqual([{ id: "other-9", firstTry: true }]); // other papers untouched
+  });
+
+  it("practice: reading time grows with the explanation (6 s to 14 s)", () => {
+    expect(readingTime("short")).toBe(6000);
+    expect(readingTime("x".repeat(150))).toBe(10500);
+    expect(readingTime("x".repeat(400))).toBe(14000);
+  });
+
+  it("practice: Retest then Cancel keeps her progress", async () => {
+    localStorage.setItem(KEY, JSON.stringify({ topics: [], sessions: [], answered: [{ id: "fr-001", firstTry: true }] }));
+    render(<App />);
+    nav("Practice");
+    await screen.findByText("Second built-in question?");
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(screen.getByRole("button", { name: /Retest/ }));
+    expect(screen.getByText("Second built-in question?")).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem(KEY)!).answered).toEqual([{ id: "fr-001", firstTry: true }]);
+  });
+
+  it("practice: switching paper during the explanation doesn't fire a stale 'next'", async () => {
+    render(<App />);
+    nav("Practice");
+    await screen.findByText("First built-in question?");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      fireEvent.click(screen.getByText("R1").closest("button")!);
+      expect(document.activeElement?.textContent).toMatch(/Next question/); // focus moves to Next
+      fireEvent.click(within(document.querySelector(".subject-tabs") as HTMLElement).getByRole("button", { name: "IBS" }));
+      act(() => { vi.advanceTimersByTime(20000); });
+      expect(JSON.parse(localStorage.getItem(KEY)!).answered).toEqual([{ id: "fr-001", firstTry: true }]);
+    } finally { vi.useRealTimers(); }
+    expect(await screen.findByText("What should Sunrise do?")).toBeTruthy();
+  });
+
+  it("practice: bad saved progress entries are dropped, old data without progress loads", () => {
+    expect(normalise({ answered: [{ id: "fr-001", firstTry: true }, { id: 3 }, null, { id: "x" }] }).answered).toEqual([{ id: "fr-001", firstTry: true }]);
+    expect(normalise({ topics: [] }).answered).toEqual([]);
+  });
+
+  it("practice: her own questions come after the built-in ones", async () => {
+    render(<App />);
+    nav("Practice");
+    await screen.findByText("First built-in question?");
     fireEvent.click(screen.getByRole("button", { name: "Add question" }));
     type("Enter the question...", "2+2?");
     ["3", "4", "5", "6"].forEach((v, i) => type(`Option ${i + 1}`, v));
     fireEvent.click(screen.getAllByRole("radio")[1]);
     fireEvent.click(screen.getByRole("button", { name: "Save question" }));
-    expect(screen.getByText("Question 1 of 1")).toBeTruthy();
-    fireEvent.click(screen.getByText("4").closest("button")!);
-    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
-    expect(screen.getByText("Correct!")).toBeTruthy();
+    expect(await screen.findByText("0 of 3 done")).toBeTruthy();
+    expect(screen.getByText("Question 1 of 3")).toBeTruthy();
+  });
+
+  it("practice: questions are shown in syllabus chapter order even if the file isn't", async () => {
+    render(<App />);
+    nav("Practice");
+    fireEvent.click(within(document.querySelector(".subject-tabs") as HTMLElement).getByRole("button", { name: "AFM" }));
+    expect(await screen.findByText("Chapter one question?")).toBeTruthy();
+    expect(screen.getByText("Question 1 of 2")).toBeTruthy();
+  });
+
+  it("practice: IBS shows the case study above its question", async () => {
+    render(<App />);
+    nav("Practice");
+    fireEvent.click(within(document.querySelector(".subject-tabs") as HTMLElement).getByRole("button", { name: "IBS" }));
+    expect(await screen.findByText("Case study 1: Sunrise Foods")).toBeTruthy();
+    expect(screen.getByText("Para two about its plans.")).toBeTruthy();
+    expect(screen.getByText("What should Sunrise do?")).toBeTruthy();
+  });
+
+  it("practice: if questions can't load (offline), says so and offers Try again", async () => {
+    render(<App />);
+    nav("Practice");
+    fireEvent.click(within(document.querySelector(".subject-tabs") as HTMLElement).getByRole("button", { name: "DT" }));
+    expect(await screen.findByText("Couldn't load the questions")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Reload" })).toBeTruthy(); // a failed import is cached by the browser; only a reload retries it
   });
 
   it("flashcards: add, flip and delete", () => {
