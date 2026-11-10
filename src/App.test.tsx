@@ -311,6 +311,58 @@ describe("user flows", () => {
   });
 });
 
+describe("install app", () => {
+  const sidebar = () => within(document.querySelector(".sidebar") as HTMLElement);
+  const fakePrompt = () => Object.assign(new Event("beforeinstallprompt", { cancelable: true }), { prompt: vi.fn(() => Promise.resolve()) });
+
+  it("Chrome/Android: button appears when the browser offers install, opens its prompt, then hides", async () => {
+    render(<App />);
+    expect(sidebar().queryByRole("button", { name: /Install app/ })).toBeNull(); // nothing to offer yet
+    const e = fakePrompt();
+    act(() => { window.dispatchEvent(e); });
+    expect(e.defaultPrevented).toBe(true); // we keep the prompt for our own button
+    fireEvent.click(sidebar().getByRole("button", { name: /Install app/ }));
+    expect(e.prompt).toHaveBeenCalledOnce();
+    await act(async () => {});
+    expect(sidebar().queryByRole("button", { name: /Install app/ })).toBeNull();
+  });
+
+  it("hides the button and confirms once the app is installed", () => {
+    render(<App />);
+    act(() => { window.dispatchEvent(fakePrompt()); });
+    act(() => { window.dispatchEvent(new Event("appinstalled")); });
+    expect(sidebar().queryByRole("button", { name: /Install app/ })).toBeNull();
+    expect(screen.getByText("App installed")).toBeTruthy();
+  });
+
+  it("iPhone: the button shows Safari's Add to Home Screen steps", () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile Safari/604.1");
+    render(<App />);
+    fireEvent.click(sidebar().getByRole("button", { name: /Install app/ }));
+    expect(screen.getByRole("heading", { name: "Install on iPhone" })).toBeTruthy();
+    expect(screen.getByText("Add to Home Screen")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Got it" }));
+    expect(screen.queryByRole("heading", { name: "Install on iPhone" })).toBeNull();
+  });
+
+  it("already installed: no button, and Settings says so", () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)");
+    window.matchMedia = vi.fn(() => ({ matches: true })) as unknown as typeof window.matchMedia;
+    try {
+      render(<App />);
+      expect(sidebar().queryByRole("button", { name: /Install app/ })).toBeNull();
+      nav("Settings");
+      expect(screen.getByText(/You're using the installed app/)).toBeTruthy();
+    } finally { delete (window as { matchMedia?: unknown }).matchMedia; }
+  });
+
+  it("browser that can't install: Settings explains where to open it", () => {
+    render(<App />);
+    nav("Settings");
+    expect(screen.getByText(/open this site in Chrome or Edge/)).toBeTruthy();
+  });
+});
+
 describe("backup, restore and reset", () => {
   it("exports a JSON file", () => {
     const create = vi.fn(() => "blob:x");

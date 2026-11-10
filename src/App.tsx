@@ -4,7 +4,7 @@ import {
   CalendarDays, Check, ChevronRight, CircleHelp, Clock3,
   FileText, GraduationCap, Home, Layers, ListChecks, Menu, Plus, Search,
   Settings, Sparkles, Trash2, X, ClipboardList, RotateCcw, ArrowLeft,
-  Star, TrendingUp, ShieldCheck, Landmark, Receipt, Briefcase
+  Star, TrendingUp, ShieldCheck, Landmark, Receipt, Briefcase, Download, Share, SquarePlus
 } from "lucide-react";
 import { SYLLABUS } from "./syllabus";
 
@@ -15,6 +15,8 @@ type Note = { id: string; subjectId: string; topicId: string; title: string; bod
 type Question = { id: string; subjectId: string; topicId: string; prompt: string; options: string[]; answer: number; explanation: string; };
 type Flashcard = { id: string; subjectId: string; front: string; back: string; };
 type Revision = { id: string; topicId: string; date: string; cycle: string; done: boolean; };
+// Chrome/Edge/Android fire this when the app can be installed; not in TypeScript's DOM types.
+type InstallPromptEvent = Event & { prompt: () => Promise<unknown> };
 type State = { subjects: Subject[]; topics: Topic[]; sessions: Session[]; notes: Note[]; questions: Question[]; flashcards: Flashcard[]; revisions: Revision[]; };
 
 const subjects: Subject[] = [
@@ -212,6 +214,23 @@ export default function App() {
   const [modal, setModal] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [toast, setToast] = useState("");
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true);
+  // Safari on iPhone/iPad (iPadOS reports itself as a Mac) has no install prompt: we show steps instead.
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  useEffect(() => {
+    const onPrompt = (e: Event) => { e.preventDefault(); setInstallPrompt(e as InstallPromptEvent); };
+    const onInstalled = () => { setInstallPrompt(null); setInstalled(true); setToast("App installed"); };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => { window.removeEventListener("beforeinstallprompt", onPrompt); window.removeEventListener("appinstalled", onInstalled); };
+  }, []);
+  const canInstall = !installed && (!!installPrompt || isIos);
+  const install = async () => {
+    if (!installPrompt) { setMobileNav(false); setModal("install-ios"); return; }
+    try { await installPrompt.prompt(); } catch { /* prompt already used or dismissed */ }
+    setInstallPrompt(null); // a prompt can only be shown once; Chrome fires a new event if it can be offered again
+  };
   const [quote, setQuote] = useState(() => (loadQuote ??= advanceQuote()));
   // A phone may resume the app the next morning without reloading; give it the next note on a new day.
   useEffect(() => {
@@ -274,7 +293,7 @@ export default function App() {
   const exportData = () => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob); const a = document.createElement("a");
-    a.href = url; a.download = "ca-final-study-companion-backup.json"; a.click(); URL.revokeObjectURL(url);
+    a.href = url; a.download = "my-ca-diary-backup.json"; a.click(); URL.revokeObjectURL(url);
   };
   const importData = (file?: File) => {
     if (!file) return;
@@ -302,7 +321,7 @@ export default function App() {
     <aside className={`sidebar ${mobileNav ? "show" : ""}`}>
       <div className="profile-mini"><div className="avatar"><img src="./avatar.jpg" alt=""/></div><div><b>{NAME}</b><small>May 2027 attempt</small></div><button className="icon-btn close-nav" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
       <nav>{nav.map(group => <div className="nav-group" key={group.label}><div className="nav-heading"><group.icon size={14}/>{group.label}</div>{group.items.map(item => <button key={item} className={`nav-item ${page === item ? "active" : ""}`} onClick={() => go(item)}>{item === "Dashboard" ? <Home/> : item === "Syllabus" ? <Layers/> : item === "Learn & Notes" ? <FileText/> : item === "Practice" ? <ClipboardList/> : item === "Flashcards" ? <Brain/> : item === "Revision" ? <RotateCcw/> : item === "Study Log" ? <Clock3/> : item === "Analytics" ? <Activity/> : <Settings/>}{item}</button>)}</div>)}</nav>
-      <div className="sidebar-bottom"><p className="tiny muted">Made with love by Jishnu Pedengal</p><div className="exam-card"><b>CA Final, May 2027</b><small>Keep going. You've got this.</small></div></div>
+      <div className="sidebar-bottom">{canInstall && <button className="secondary install-btn" onClick={install}><Download size={17}/> Install app</button>}<p className="tiny muted">Made with love by Jishnu Pedengal</p><div className="exam-card"><b>CA Final, May 2027</b><small>Keep going. You've got this.</small></div></div>
     </aside>
     {mobileNav && <div className="scrim" onClick={() => setMobileNav(false)}/>}
     <main className="main">
@@ -316,7 +335,7 @@ export default function App() {
         {page === "Revision" && <RevisionPage data={data} onAdd={r=>{update({revisions:[...data.revisions,r]});notify("Revision scheduled");}} onToggle={id=>update({revisions:data.revisions.map(r=>r.id===id?{...r,done:!r.done}:r)})}/>}
         {page === "Study Log" && <StudyLog data={data} onAdd={() => setModal("session")} onDelete={id=>update({sessions:data.sessions.filter(s=>s.id!==id)})}/>}
         {page === "Analytics" && <Analytics data={data}/>}
-        {page === "Settings" && <SettingsPage onExport={exportData} onImport={()=>fileRef.current?.click()} onReset={()=>{if(confirm("Reset all app data in this browser? Export a backup first if you need it.")){setData(emptyState);notify("App data reset");}}}/>}
+        {page === "Settings" && <SettingsPage canInstall={canInstall} installed={installed} onInstall={install} onExport={exportData} onImport={()=>fileRef.current?.click()} onReset={()=>{if(confirm("Reset all app data in this browser? Export a backup first if you need it.")){setData(emptyState);notify("App data reset");}}}/>}
       </div>
     </main>
     <nav className="tabbar" aria-label="Quick navigation">
@@ -329,6 +348,7 @@ export default function App() {
     <input ref={fileRef} hidden type="file" accept="application/json" onChange={e=>{importData(e.target.files?.[0]);e.target.value="";}}/>
     {modal === "topic" && <TopicModal onClose={()=>setModal("")} onSave={addTopic}/>}
     {modal === "session" && <SessionModal data={data} onClose={()=>setModal("")} onSave={addSession}/>}
+    {modal === "install-ios" && <InstallIosModal onClose={()=>setModal("")}/>}
     {toast && <div className="toast"><Check size={16}/>{toast}</div>}
   </div>;
 }
@@ -466,8 +486,9 @@ function Analytics({data}:{data:State}) {
     <div className="two-col"><section className="panel"><h2>Preparation snapshot</h2><div className="snapshot-line"><span>Topics marked completed</span><b>{data.topics.filter(t=>t.status==="Completed").length}</b></div><div className="snapshot-line"><span>Topics currently learning</span><b>{data.topics.filter(t=>t.status==="Learning").length}</b></div><div className="snapshot-line"><span>Notes saved</span><b>{data.notes.length}</b></div><div className="snapshot-line"><span>Flashcards created</span><b>{data.flashcards.length}</b></div></section><section className="panel"><h2>Practice & revision</h2><div className="snapshot-line"><span>Questions in bank</span><b>{data.questions.length}</b></div><div className="snapshot-line"><span>Revisions scheduled</span><b>{data.revisions.length}</b></div><div className="snapshot-line"><span>Revisions completed</span><b>{data.revisions.filter(r=>r.done).length}</b></div><p className="tiny muted">Analytics are based only on information entered in this app. No target hours are assumed.</p></section></div>
   </>;
 }
-function SettingsPage({onExport,onImport,onReset}:{onExport:()=>void;onImport:()=>void;onReset:()=>void}) {
-  return <><PageTitle title="Settings" desc="Back up, restore or reset your study data."/>
+function SettingsPage({canInstall,installed,onInstall,onExport,onImport,onReset}:{canInstall:boolean;installed:boolean;onInstall:()=>void;onExport:()=>void;onImport:()=>void;onReset:()=>void}) {
+  return <><PageTitle title="Settings" desc="Install the app, and back up, restore or reset your study data."/>
+    <section className="panel settings-panel"><h2>Install the app</h2>{installed?<p className="muted">You're using the installed app. Open it any time from the black CA icon.</p>:<><p className="muted">Add the app to your home screen or computer. It opens in its own window with the black CA icon, and keeps all your data.</p>{canInstall?<div className="backup-actions"><button className="primary" onClick={onInstall}><Download size={17}/> Install app</button></div>:<p className="muted install-hint">To install, open this site in Chrome or Edge (any phone or computer), or in Safari on iPhone.</p>}</>}</section>
     <section className="panel settings-panel"><h2>Backup & restore</h2><p className="muted">Your data is stored locally in this browser. Export backups regularly, especially before clearing browser data or changing devices.</p><div className="backup-actions"><button className="secondary" onClick={onExport}><ArrowDownToLine size={17}/> Export backup (.json)</button><button className="secondary" onClick={onImport}><ArrowUpFromLine size={17}/> Restore backup</button></div></section>
     <section className="panel settings-panel"><h2>About your data</h2><ul className="plain-list"><li>There is no login or cloud sync. Your data stays in this browser.</li><li>Use Export backup to move your data to another browser or device.</li><li>Uploaded PDFs are not uploaded to a server. Add links to your resources or keep files in your own storage.</li><li>The syllabus is editable and should be checked against the ICAI material applicable to your exam attempt.</li></ul><div className="warning-box"><b>Reset app data</b><p>This removes the locally saved study data from this browser. Export a backup first if you want to keep it.</p><button className="danger-btn" onClick={onReset}><Trash2 size={15}/> Reset this browser's data</button></div></section>
   </>;
@@ -481,6 +502,9 @@ function SessionModal({data,onClose,onSave}:{data:State;onClose:()=>void;onSave:
   const [date,setDate]=useState(today());const [subjectId,setSubjectId]=useState("fr");const [topicId,setTopicId]=useState("");const [hours,setHours]=useState("1");const [minutes,setMinutes]=useState("0");const [note,setNote]=useState("");
   const topicOptions=data.topics.filter(t=>t.subjectId===subjectId);
   return <Modal title="Log a study session" onClose={onClose}><p className="muted modal-desc">Enter the time you actually studied. You can log more than one session per day.</p><label className="field-label">Date</label><input className="text-input" type="date" value={date} onChange={e=>setDate(e.target.value)}/><label className="field-label">Subject</label><select className="select-input" value={subjectId} onChange={e=>{setSubjectId(e.target.value);setTopicId("");}}>{subjects.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select><label className="field-label">Topic (optional)</label><select className="select-input" value={topicId} onChange={e=>setTopicId(e.target.value)}><option value="">General study</option>{topicOptions.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><label className="field-label">Actual study time</label><div className="duration-inputs"><div><input className="text-input" type="number" min="0" max="24" value={hours} onChange={e=>setHours(e.target.value)}/><small>Hours</small></div><div><input className="text-input" type="number" min="0" max="59" value={minutes} onChange={e=>setMinutes(e.target.value)}/><small>Minutes</small></div></div><label className="field-label">What did you cover? (optional)</label><input className="text-input" value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Read concepts and solved illustrations"/><div className="modal-actions"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" disabled={(Number(hours)||0)*60+(Number(minutes)||0)<=0||Number(hours)<0||Number(minutes)<0||Number(minutes)>59} onClick={()=>onSave({date,subjectId,topicId,topicName:topicOptions.find(t=>t.id===topicId)?.name||"",minutes:(Number(hours)||0)*60+(Number(minutes)||0),note})}>Save session</button></div></Modal>;
+}
+function InstallIosModal({onClose}:{onClose:()=>void}) {
+  return <Modal title="Install on iPhone" onClose={onClose}><p className="muted modal-desc">Apple only allows installing from Safari's Share menu. It takes three taps:</p><ol className="install-steps"><li>Tap the <b>Share</b> button <Share size={17} aria-label="Share icon"/> at the bottom of Safari (top right on iPad).</li><li>Scroll down and tap <b>Add to Home Screen</b> <SquarePlus size={17} aria-label="Add icon"/>.</li><li>Tap <b>Add</b>. The black CA icon appears on your home screen.</li></ol><div className="modal-actions"><button className="primary" onClick={onClose}>Got it</button></div></Modal>;
 }
 function Modal({title,onClose,children}:{title:string;onClose:()=>void;children:React.ReactNode}) {return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><div className="modal"><div className="modal-head"><h2>{title}</h2><button className="icon-btn" onClick={onClose}><X size={18}/></button></div>{children}</div></div>;}
 

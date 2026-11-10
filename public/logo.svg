@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full-bleed black so Android's round/rounded masks crop cleanly; artwork sits inside the 40% safe circle. -->
+  <rect width="512" height="512" fill="#000"/>
+  <g transform="translate(256 256) scale(.88) translate(-256 -282)">
+    <!-- open book -->
+    <path d="M250 150C214 124 160 118 116 130V282C160 270 214 275 250 300Z" fill="#fff"/>
+    <path d="M262 150C298 124 352 118 396 130V282C352 270 298 275 262 300Z" fill="#fff"/>
+    <!-- CA, drawn as strokes so it looks the same everywhere (no font needed) -->
+    <g fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M231.8 353.2A45 45 0 1 0 231.8 416.8"/>
+      <path d="M272 430L312 340L352 430M287 400H337"/>
+    </g>
+  </g>
+</svg>

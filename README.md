@@ -1,4 +1,4 @@
-# CA Final Study Companion
+# My CA Diary
 
 A personal, frontend-only CA Final preparation app built with React, Vite and TypeScript.
 
